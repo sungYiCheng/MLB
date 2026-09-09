@@ -1,0 +1,67 @@
+<main class="app-shell">
+  <section class="scoreboard">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">MLB AI Daily</p>
+        <h1>Today's MLB Games</h1>
+      </div>
+
+      <button type="button" class="refresh-button" (click)="loadGames()" [disabled]="isLoading()">
+        <span aria-hidden="true">↻</span>
+        <span>Refresh</span>
+      </button>
+    </header>
+
+    <div class="summary-strip" aria-live="polite">
+      <div>
+        <span class="summary-value">{{ totalGames() }}</span>
+        <span class="summary-label">Games</span>
+      </div>
+      <div>
+        <span class="summary-value">{{ liveGames() }}</span>
+        <span class="summary-label">Live</span>
+      </div>
+      <div>
+        <span class="summary-value">{{ finalGames() }}</span>
+        <span class="summary-label">Final</span>
+      </div>
+    </div>
+
+    @if (isLoading()) {
+      <div class="state-panel">Loading today's schedule...</div>
+    } @else if (errorMessage()) {
+      <div class="state-panel error">{{ errorMessage() }}</div>
+    } @else if (games().length === 0) {
+      <div class="state-panel">No MLB games are scheduled for today.</div>
+    } @else {
+      <div class="games-list">
+        @for (game of games(); track game.gamePk) {
+          <article class="game-card">
+            <div class="game-meta">
+              <span class="status" [class.live]="isLive(game.status)">{{ game.status }}</span>
+              <time>{{ formatTaipeiTime(game.gameTimeUtc) }}</time>
+            </div>
+
+            <div class="matchup">
+              <div class="team away">
+                <img [src]="teamLogoUrl(game.awayTeamId)" [alt]="game.awayTeam + ' logo'" />
+                <span>{{ game.awayTeam }}</span>
+              </div>
+
+              <div class="score">
+                <span>{{ scoreText(game.awayScore) }}</span>
+                <span class="divider">-</span>
+                <span>{{ scoreText(game.homeScore) }}</span>
+              </div>
+
+              <div class="team home">
+                <span>{{ game.homeTeam }}</span>
+                <img [src]="teamLogoUrl(game.homeTeamId)" [alt]="game.homeTeam + ' logo'" />
+              </div>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </section>
+</main>
