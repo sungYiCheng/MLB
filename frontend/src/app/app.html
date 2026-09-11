@@ -1,7 +1,7 @@
 <main class="app-shell">
   <section class="scoreboard">
     <header class="topbar">
-      <div>
+      <div class="title-stack">
         <p class="eyebrow">MLB AI Daily</p>
         <h1>Today's MLB Games</h1>
       </div>
@@ -13,15 +13,15 @@
     </header>
 
     <div class="summary-strip" aria-live="polite">
-      <div>
+      <div class="summary-card">
         <span class="summary-value">{{ totalGames() }}</span>
         <span class="summary-label">Games</span>
       </div>
-      <div>
+      <div class="summary-card">
         <span class="summary-value">{{ liveGames() }}</span>
         <span class="summary-label">Live</span>
       </div>
-      <div>
+      <div class="summary-card">
         <span class="summary-value">{{ finalGames() }}</span>
         <span class="summary-label">Final</span>
       </div>
@@ -54,7 +54,10 @@
               <div class="matchup">
                 <div class="team away" [class.winner]="game.awayWinner">
                   <img [src]="teamLogoUrl(game.awayTeamId)" [alt]="game.awayTeam + ' logo'" />
-                  <span>{{ game.awayTeam }}</span>
+                  <span class="team-copy">
+                    <span class="team-name">{{ game.awayTeam }}</span>
+                    <span class="team-record">Record {{ detailText(game.awayRecord) }}</span>
+                  </span>
                 </div>
 
                 <div class="score">
@@ -64,7 +67,10 @@
                 </div>
 
                 <div class="team home" [class.winner]="game.homeWinner">
-                  <span>{{ game.homeTeam }}</span>
+                  <span class="team-copy">
+                    <span class="team-name">{{ game.homeTeam }}</span>
+                    <span class="team-record">Record {{ detailText(game.homeRecord) }}</span>
+                  </span>
                   <img [src]="teamLogoUrl(game.homeTeamId)" [alt]="game.homeTeam + ' logo'" />
                 </div>
               </div>
