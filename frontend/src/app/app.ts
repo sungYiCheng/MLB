@@ -114,6 +114,26 @@ export class App implements OnInit {
     return value ?? 'TBD';
   }
 
+  protected hasList(value: readonly unknown[] | null | undefined): boolean {
+    return Boolean(value?.length);
+  }
+
+  protected pitcherCountText(pitchers: MlbPitcherLine[] | null | undefined): string {
+    const pitcherCount = pitchers?.length ?? 0;
+    return `${pitcherCount} pitcher${pitcherCount === 1 ? '' : 's'} used`;
+  }
+
+  protected battingLine(batter: MlbBatterLine): string {
+    return [
+      `${this.detailText(batter.hits)}-${this.detailText(batter.atBats)}`,
+      `${this.detailText(batter.rbi)} RBI`,
+      `${this.detailText(batter.runs)} R`,
+      `${this.detailText(batter.homeRuns)} HR`,
+      `${this.detailText(batter.walks)} BB`,
+      `${this.detailText(batter.strikeOuts)} K`
+    ].join(' · ');
+  }
+
   protected teamLogoUrl(teamId: number | null): string {
     return teamId
       ? `https://www.mlbstatic.com/team-logos/${teamId}.svg`
@@ -157,4 +177,37 @@ interface MlbGame {
   awayErrors: number | null;
   homeHits: number | null;
   homeErrors: number | null;
+  awayPitchers: MlbPitcherLine[] | null;
+  homePitchers: MlbPitcherLine[] | null;
+  awayBattingLeaders: MlbBatterLine[] | null;
+  homeBattingLeaders: MlbBatterLine[] | null;
+  homeRunHitters: MlbBatterLine[] | null;
+  highlights: string[] | null;
+}
+
+interface MlbPitcherLine {
+  name: string;
+  inningsPitched: string | null;
+  hits: number | null;
+  runs: number | null;
+  earnedRuns: number | null;
+  strikeOuts: number | null;
+  walks: number | null;
+  pitches: number | null;
+  summary: string | null;
+}
+
+interface MlbBatterLine {
+  name: string;
+  team: string;
+  atBats: number | null;
+  runs: number | null;
+  hits: number | null;
+  doubles: number | null;
+  triples: number | null;
+  homeRuns: number | null;
+  rbi: number | null;
+  walks: number | null;
+  strikeOuts: number | null;
+  summary: string | null;
 }

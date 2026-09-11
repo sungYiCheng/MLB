@@ -308,6 +308,105 @@ h1 {
   font-weight: 950;
 }
 
+.insight-sections,
+.split-panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.insight-panel {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e3e6dc;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.insight-panel h2 {
+  margin: 0 0 10px;
+  color: #111827;
+  font-size: 0.95rem;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.panel-summary,
+.empty-note {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.highlight-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: #334155;
+  font-weight: 750;
+}
+
+.compact-lines,
+.batter-list {
+  display: grid;
+  gap: 8px;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.batter-list > div {
+  display: grid;
+  gap: 2px;
+}
+
+.batter-name {
+  color: #111827;
+  font-weight: 950;
+}
+
+.stat-table {
+  display: grid;
+  gap: 1px;
+  overflow-x: auto;
+  margin-top: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #e2e8f0;
+}
+
+.stat-header,
+.stat-row {
+  display: grid;
+  grid-template-columns: minmax(132px, 2fr) repeat(7, minmax(38px, 1fr));
+  gap: 1px;
+  min-width: 520px;
+}
+
+.stat-header span,
+.stat-row span {
+  min-width: 0;
+  padding: 8px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.stat-header span {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.stat-row span:first-child {
+  color: #111827;
+  font-weight: 950;
+}
+
 @media (max-width: 720px) {
   .app-shell {
     padding: 20px;
@@ -351,7 +450,9 @@ h1 {
   }
 
   .detail-grid,
-  .team-details {
+  .team-details,
+  .insight-sections,
+  .split-panels {
     grid-template-columns: 1fr;
   }
 }

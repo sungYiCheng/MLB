@@ -35,4 +35,35 @@ public sealed record MlbGameDto(
     int? AwayHits = null,
     int? AwayErrors = null,
     int? HomeHits = null,
-    int? HomeErrors = null);
+    int? HomeErrors = null,
+    IReadOnlyList<MlbPitcherLineDto>? AwayPitchers = null,
+    IReadOnlyList<MlbPitcherLineDto>? HomePitchers = null,
+    IReadOnlyList<MlbBatterLineDto>? AwayBattingLeaders = null,
+    IReadOnlyList<MlbBatterLineDto>? HomeBattingLeaders = null,
+    IReadOnlyList<MlbBatterLineDto>? HomeRunHitters = null,
+    IReadOnlyList<string>? Highlights = null);
+
+public sealed record MlbPitcherLineDto(
+    string Name,
+    string? InningsPitched,
+    int? Hits,
+    int? Runs,
+    int? EarnedRuns,
+    int? StrikeOuts,
+    int? Walks,
+    int? Pitches,
+    string? Summary);
+
+public sealed record MlbBatterLineDto(
+    string Name,
+    string Team,
+    int? AtBats,
+    int? Runs,
+    int? Hits,
+    int? Doubles,
+    int? Triples,
+    int? HomeRuns,
+    int? Rbi,
+    int? Walks,
+    int? StrikeOuts,
+    string? Summary);

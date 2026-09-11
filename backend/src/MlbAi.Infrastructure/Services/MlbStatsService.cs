@@ -25,11 +25,68 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
             return [];
         }
 
-        return response.Dates
+        var games = response.Dates
             .SelectMany(scheduleDate => scheduleDate.Games.Select(game => ToDto(scheduleDate, game)))
             .OrderBy(game => game.GameTimeUtc)
             .ThenBy(game => game.HomeTeam)
             .ToList();
+
+        var detailedGames = await Task.WhenAll(
+            games.Select(game => AddBoxScoreDetailsAsync(game, cancellationToken)));
+
+        return detailedGames
+            .OrderBy(game => game.GameTimeUtc)
+            .ThenBy(game => game.HomeTeam)
+            .ToList();
+    }
+
+    private async Task<MlbGameDto> AddBoxScoreDetailsAsync(
+        MlbGameDto game,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var requestUri = $"https://statsapi.mlb.com/api/v1.1/game/{game.GamePk}/feed/live";
+            var response = await httpClient.GetFromJsonAsync<MlbLiveFeedResponse>(requestUri, cancellationToken);
+            var awayBox = response?.LiveData?.Boxscore?.Teams?.Away;
+            var homeBox = response?.LiveData?.Boxscore?.Teams?.Home;
+
+            var awayPitchers = BuildPitcherLines(awayBox);
+            var homePitchers = BuildPitcherLines(homeBox);
+            var awayBattingLeaders = BuildBattingLeaders(awayBox, game.AwayTeam);
+            var homeBattingLeaders = BuildBattingLeaders(homeBox, game.HomeTeam);
+            var homeRunHitters = awayBattingLeaders
+                .Concat(homeBattingLeaders)
+                .Where(player => player.HomeRuns.GetValueOrDefault() > 0)
+                .OrderByDescending(player => player.HomeRuns)
+                .ThenByDescending(player => player.Rbi)
+                .ThenBy(player => player.Name)
+                .ToList();
+
+            return game with
+            {
+                AwayPitchers = awayPitchers,
+                HomePitchers = homePitchers,
+                AwayBattingLeaders = awayBattingLeaders,
+                HomeBattingLeaders = homeBattingLeaders,
+                HomeRunHitters = homeRunHitters,
+                Highlights = BuildHighlights(
+                    game,
+                    awayPitchers,
+                    homePitchers,
+                    awayBattingLeaders,
+                    homeBattingLeaders,
+                    homeRunHitters)
+            };
+        }
+        catch (HttpRequestException)
+        {
+            return game;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return game;
+        }
     }
 
     private static MlbGameDto ToDto(MlbScheduleDate scheduleDate, MlbScheduleGame game)
@@ -113,6 +170,129 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
         return string.IsNullOrWhiteSpace(value)
             ? null
             : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.ToLowerInvariant());
+    }
+
+    private static IReadOnlyList<MlbPitcherLineDto> BuildPitcherLines(MlbBoxScoreTeam? boxScoreTeam)
+    {
+        if (boxScoreTeam?.Pitchers is null)
+        {
+            return [];
+        }
+
+        return boxScoreTeam.Pitchers
+            .Select(boxScoreTeam.TryGetPlayer)
+            .Where(player => player?.Stats?.Pitching is not null)
+            .Select(player =>
+            {
+                var pitching = player!.Stats!.Pitching!;
+
+                return new MlbPitcherLineDto(
+                    Name: player.Person?.FullName ?? "Unknown Pitcher",
+                    InningsPitched: pitching.InningsPitched,
+                    Hits: pitching.Hits,
+                    Runs: pitching.Runs,
+                    EarnedRuns: pitching.EarnedRuns,
+                    StrikeOuts: pitching.StrikeOuts,
+                    Walks: pitching.BaseOnBalls,
+                    Pitches: pitching.NumberOfPitches ?? pitching.PitchesThrown,
+                    Summary: pitching.Summary);
+            })
+            .ToList();
+    }
+
+    private static IReadOnlyList<MlbBatterLineDto> BuildBattingLeaders(MlbBoxScoreTeam? boxScoreTeam, string teamName)
+    {
+        if (boxScoreTeam?.Batters is null)
+        {
+            return [];
+        }
+
+        return boxScoreTeam.Batters
+            .Select(boxScoreTeam.TryGetPlayer)
+            .Where(player => player?.Stats?.Batting is not null)
+            .Select(player =>
+            {
+                var batting = player!.Stats!.Batting!;
+
+                return new MlbBatterLineDto(
+                    Name: player.Person?.FullName ?? "Unknown Batter",
+                    Team: teamName,
+                    AtBats: batting.AtBats,
+                    Runs: batting.Runs,
+                    Hits: batting.Hits,
+                    Doubles: batting.Doubles,
+                    Triples: batting.Triples,
+                    HomeRuns: batting.HomeRuns,
+                    Rbi: batting.Rbi,
+                    Walks: batting.BaseOnBalls,
+                    StrikeOuts: batting.StrikeOuts,
+                    Summary: batting.Summary);
+            })
+            .Where(player =>
+                player.HomeRuns.GetValueOrDefault() > 0 ||
+                player.Rbi.GetValueOrDefault() > 0 ||
+                player.Hits.GetValueOrDefault() >= 2 ||
+                player.Runs.GetValueOrDefault() >= 2)
+            .OrderByDescending(player => player.HomeRuns)
+            .ThenByDescending(player => player.Rbi)
+            .ThenByDescending(player => player.Hits)
+            .ThenBy(player => player.Name)
+            .Take(6)
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> BuildHighlights(
+        MlbGameDto game,
+        IReadOnlyList<MlbPitcherLineDto> awayPitchers,
+        IReadOnlyList<MlbPitcherLineDto> homePitchers,
+        IReadOnlyList<MlbBatterLineDto> awayBattingLeaders,
+        IReadOnlyList<MlbBatterLineDto> homeBattingLeaders,
+        IReadOnlyList<MlbBatterLineDto> homeRunHitters)
+    {
+        var highlights = new List<string>();
+
+        if (homeRunHitters.Count > 0)
+        {
+            var homeRuns = string.Join(", ", homeRunHitters.Select(player => $"{player.Name} ({player.Team})"));
+            highlights.Add($"Home runs: {homeRuns}");
+        }
+
+        var bestPitchingLine = awayPitchers
+            .Concat(homePitchers)
+            .Where(player => player.StrikeOuts.GetValueOrDefault() >= 5 || player.EarnedRuns.GetValueOrDefault() == 0)
+            .OrderBy(player => player.EarnedRuns.GetValueOrDefault())
+            .ThenByDescending(player => player.StrikeOuts)
+            .FirstOrDefault();
+
+        if (bestPitchingLine is not null)
+        {
+            var pitchingSummary = bestPitchingLine.Summary ?? $"{bestPitchingLine.InningsPitched} IP";
+            highlights.Add($"{bestPitchingLine.Name}: {pitchingSummary}");
+        }
+
+        var bestBatter = awayBattingLeaders
+            .Concat(homeBattingLeaders)
+            .OrderByDescending(player => player.Rbi)
+            .ThenByDescending(player => player.Hits)
+            .FirstOrDefault();
+
+        if (bestBatter is not null)
+        {
+            var battingSummary = bestBatter.Summary ?? $"{bestBatter.Hits} H, {bestBatter.Rbi} RBI";
+            highlights.Add($"{bestBatter.Name}: {battingSummary}");
+        }
+
+        if (awayPitchers.Count > 0 || homePitchers.Count > 0)
+        {
+            highlights.Add($"{game.AwayTeam} used {awayPitchers.Count} pitcher{Pluralize(awayPitchers.Count)}; {game.HomeTeam} used {homePitchers.Count} pitcher{Pluralize(homePitchers.Count)}.");
+        }
+
+        return highlights;
+    }
+
+    private static string Pluralize(int count)
+    {
+        return count == 1 ? string.Empty : "s";
     }
 
     private static DateOnly? ParseDateOnly(string? value)
@@ -253,5 +433,80 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
     {
         public int? Hits { get; set; }
         public int? Errors { get; set; }
+    }
+
+    private sealed class MlbLiveFeedResponse
+    {
+        public MlbLiveData? LiveData { get; set; }
+    }
+
+    private sealed class MlbLiveData
+    {
+        public MlbBoxscore? Boxscore { get; set; }
+    }
+
+    private sealed class MlbBoxscore
+    {
+        public MlbBoxScoreTeams? Teams { get; set; }
+    }
+
+    private sealed class MlbBoxScoreTeams
+    {
+        public MlbBoxScoreTeam? Away { get; set; }
+        public MlbBoxScoreTeam? Home { get; set; }
+    }
+
+    private sealed class MlbBoxScoreTeam
+    {
+        public List<int> Batters { get; set; } = [];
+        public List<int> Pitchers { get; set; } = [];
+        public Dictionary<string, MlbBoxScorePlayer> Players { get; set; } = [];
+
+        public MlbBoxScorePlayer? TryGetPlayer(int playerId)
+        {
+            return Players.TryGetValue($"ID{playerId}", out var player)
+                ? player
+                : null;
+        }
+    }
+
+    private sealed class MlbBoxScorePlayer
+    {
+        public MlbPerson? Person { get; set; }
+        public MlbPlayerStats? Stats { get; set; }
+    }
+
+    private sealed class MlbPlayerStats
+    {
+        public MlbBattingStats? Batting { get; set; }
+        public MlbPitchingStats? Pitching { get; set; }
+    }
+
+    private sealed class MlbBattingStats
+    {
+        public string? Summary { get; set; }
+        public int? Runs { get; set; }
+        public int? Doubles { get; set; }
+        public int? Triples { get; set; }
+        public int? HomeRuns { get; set; }
+        public int? StrikeOuts { get; set; }
+        public int? BaseOnBalls { get; set; }
+        public int? Hits { get; set; }
+        public int? AtBats { get; set; }
+        public int? Rbi { get; set; }
+    }
+
+    private sealed class MlbPitchingStats
+    {
+        public string? Summary { get; set; }
+        public int? Runs { get; set; }
+        public int? HomeRuns { get; set; }
+        public int? StrikeOuts { get; set; }
+        public int? BaseOnBalls { get; set; }
+        public int? Hits { get; set; }
+        public int? NumberOfPitches { get; set; }
+        public string? InningsPitched { get; set; }
+        public int? EarnedRuns { get; set; }
+        public int? PitchesThrown { get; set; }
     }
 }

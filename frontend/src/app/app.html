@@ -121,6 +121,128 @@
                     <span>Hits / Errors: {{ detailText(game.homeHits) }} / {{ detailText(game.homeErrors) }}</span>
                   </div>
                 </div>
+
+                <div class="insight-sections">
+                  <section class="insight-panel">
+                    <h2>Highlights</h2>
+                    @if (hasList(game.highlights)) {
+                      <ul class="highlight-list">
+                        @for (highlight of game.highlights ?? []; track highlight) {
+                          <li>{{ highlight }}</li>
+                        }
+                      </ul>
+                    } @else {
+                      <p class="empty-note">No highlight notes yet.</p>
+                    }
+                  </section>
+
+                  <section class="insight-panel">
+                    <h2>Home Runs</h2>
+                    @if (hasList(game.homeRunHitters)) {
+                      <div class="compact-lines">
+                        @for (batter of game.homeRunHitters ?? []; track batter.name + batter.team) {
+                          <span>{{ batter.name }} · {{ batter.team }} · {{ detailText(batter.homeRuns) }} HR</span>
+                        }
+                      </div>
+                    } @else {
+                      <p class="empty-note">No home runs recorded.</p>
+                    }
+                  </section>
+                </div>
+
+                <div class="split-panels">
+                  <section class="insight-panel">
+                    <h2>{{ game.awayTeam }} Pitching</h2>
+                    <p class="panel-summary">{{ pitcherCountText(game.awayPitchers) }}</p>
+                    <div class="stat-table">
+                      <div class="stat-header">
+                        <span>Pitcher</span>
+                        <span>IP</span>
+                        <span>H</span>
+                        <span>R</span>
+                        <span>ER</span>
+                        <span>K</span>
+                        <span>BB</span>
+                        <span>P</span>
+                      </div>
+                      @for (pitcher of game.awayPitchers ?? []; track pitcher.name) {
+                        <div class="stat-row">
+                          <span>{{ pitcher.name }}</span>
+                          <span>{{ detailText(pitcher.inningsPitched) }}</span>
+                          <span>{{ detailText(pitcher.hits) }}</span>
+                          <span>{{ detailText(pitcher.runs) }}</span>
+                          <span>{{ detailText(pitcher.earnedRuns) }}</span>
+                          <span>{{ detailText(pitcher.strikeOuts) }}</span>
+                          <span>{{ detailText(pitcher.walks) }}</span>
+                          <span>{{ detailText(pitcher.pitches) }}</span>
+                        </div>
+                      }
+                    </div>
+                  </section>
+
+                  <section class="insight-panel">
+                    <h2>{{ game.homeTeam }} Pitching</h2>
+                    <p class="panel-summary">{{ pitcherCountText(game.homePitchers) }}</p>
+                    <div class="stat-table">
+                      <div class="stat-header">
+                        <span>Pitcher</span>
+                        <span>IP</span>
+                        <span>H</span>
+                        <span>R</span>
+                        <span>ER</span>
+                        <span>K</span>
+                        <span>BB</span>
+                        <span>P</span>
+                      </div>
+                      @for (pitcher of game.homePitchers ?? []; track pitcher.name) {
+                        <div class="stat-row">
+                          <span>{{ pitcher.name }}</span>
+                          <span>{{ detailText(pitcher.inningsPitched) }}</span>
+                          <span>{{ detailText(pitcher.hits) }}</span>
+                          <span>{{ detailText(pitcher.runs) }}</span>
+                          <span>{{ detailText(pitcher.earnedRuns) }}</span>
+                          <span>{{ detailText(pitcher.strikeOuts) }}</span>
+                          <span>{{ detailText(pitcher.walks) }}</span>
+                          <span>{{ detailText(pitcher.pitches) }}</span>
+                        </div>
+                      }
+                    </div>
+                  </section>
+                </div>
+
+                <div class="split-panels">
+                  <section class="insight-panel">
+                    <h2>{{ game.awayTeam }} Batting Notes</h2>
+                    @if (hasList(game.awayBattingLeaders)) {
+                      <div class="batter-list">
+                        @for (batter of game.awayBattingLeaders ?? []; track batter.name) {
+                          <div>
+                            <span class="batter-name">{{ batter.name }}</span>
+                            <span>{{ battingLine(batter) }}</span>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <p class="empty-note">No standout batting lines yet.</p>
+                    }
+                  </section>
+
+                  <section class="insight-panel">
+                    <h2>{{ game.homeTeam }} Batting Notes</h2>
+                    @if (hasList(game.homeBattingLeaders)) {
+                      <div class="batter-list">
+                        @for (batter of game.homeBattingLeaders ?? []; track batter.name) {
+                          <div>
+                            <span class="batter-name">{{ batter.name }}</span>
+                            <span>{{ battingLine(batter) }}</span>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <p class="empty-note">No standout batting lines yet.</p>
+                    }
+                  </section>
+                </div>
               </div>
             }
           </article>
