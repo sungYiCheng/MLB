@@ -469,7 +469,7 @@ h1 {
   font-weight: 790;
 }
 
-.compact-lines span,
+.compact-lines > span,
 .batter-list > div {
   padding: 10px;
   border: 1px solid #e7ece4;
@@ -477,12 +477,47 @@ h1 {
   background: #fbfcf8;
 }
 
-.batter-list > div {
+.player-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.player-chip > span,
+.batter-list > div > span {
   display: grid;
-  gap: 3px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.player-chip img,
+.batter-list img,
+.player-cell img {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 1px solid #d8dfd4;
+  border-radius: 50%;
+  background:
+    linear-gradient(180deg, #ffffff, #e2e8f0),
+    #ffffff;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.player-name {
+  color: #111827;
+  font-weight: 950;
+}
+
+.batter-list > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .batter-name {
+  display: block;
   color: #111827;
   font-weight: 950;
 }
@@ -505,8 +540,8 @@ h1 {
   min-width: 560px;
 }
 
-.stat-header span,
-.stat-row span {
+.stat-header > span,
+.stat-row > span {
   min-width: 0;
   padding: 8px;
   background: #ffffff;
@@ -515,7 +550,7 @@ h1 {
   font-weight: 820;
 }
 
-.stat-header span {
+.stat-header > span {
   background: #f1f5f9;
   color: #64748b;
   font-size: 0.68rem;
@@ -524,9 +559,19 @@ h1 {
   text-transform: uppercase;
 }
 
-.stat-row span:first-child {
+.stat-row > span:first-child {
   color: #111827;
   font-weight: 950;
+}
+
+.player-cell {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.player-cell span {
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 920px) {

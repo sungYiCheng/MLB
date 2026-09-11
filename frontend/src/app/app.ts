@@ -139,6 +139,20 @@ export class App implements OnInit {
       ? `https://www.mlbstatic.com/team-logos/${teamId}.svg`
       : 'https://www.mlbstatic.com/team-logos/league-on-dark/1.svg';
   }
+
+  protected playerHeadshotUrl(playerId: number | null): string {
+    return playerId
+      ? `https://img.mlbstatic.com/mlb-photos/image/upload/w_96,q_auto:best/v1/people/${playerId}/headshot/67/current`
+      : 'https://www.mlbstatic.com/team-logos/league-on-dark/1.svg';
+  }
+
+  protected hideBrokenImage(event: Event): void {
+    const image = event.target;
+
+    if (image instanceof HTMLImageElement) {
+      image.style.display = 'none';
+    }
+  }
 }
 
 interface MlbGame {
@@ -186,6 +200,7 @@ interface MlbGame {
 }
 
 interface MlbPitcherLine {
+  playerId: number | null;
   name: string;
   inningsPitched: string | null;
   hits: number | null;
@@ -198,6 +213,7 @@ interface MlbPitcherLine {
 }
 
 interface MlbBatterLine {
+  playerId: number | null;
   name: string;
   team: string;
   atBats: number | null;

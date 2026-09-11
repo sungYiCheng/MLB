@@ -44,6 +44,7 @@ public sealed record MlbGameDto(
     IReadOnlyList<string>? Highlights = null);
 
 public sealed record MlbPitcherLineDto(
+    int? PlayerId,
     string Name,
     string? InningsPitched,
     int? Hits,
@@ -55,6 +56,7 @@ public sealed record MlbPitcherLineDto(
     string? Summary);
 
 public sealed record MlbBatterLineDto(
+    int? PlayerId,
     string Name,
     string Team,
     int? AtBats,

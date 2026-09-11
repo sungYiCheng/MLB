@@ -147,7 +147,17 @@
                     @if (hasList(game.homeRunHitters)) {
                       <div class="compact-lines">
                         @for (batter of game.homeRunHitters ?? []; track batter.name + batter.team) {
-                          <span>{{ batter.name }} · {{ batter.team }} · {{ detailText(batter.homeRuns) }} HR</span>
+                          <span class="player-chip">
+                            <img
+                              [src]="playerHeadshotUrl(batter.playerId)"
+                              [alt]="batter.name + ' headshot'"
+                              (error)="hideBrokenImage($event)"
+                            />
+                            <span>
+                              <span class="player-name">{{ batter.name }}</span>
+                              <span>{{ batter.team }} · {{ detailText(batter.homeRuns) }} HR</span>
+                            </span>
+                          </span>
                         }
                       </div>
                     } @else {
@@ -173,7 +183,14 @@
                       </div>
                       @for (pitcher of game.awayPitchers ?? []; track pitcher.name) {
                         <div class="stat-row">
-                          <span>{{ pitcher.name }}</span>
+                          <span class="player-cell">
+                            <img
+                              [src]="playerHeadshotUrl(pitcher.playerId)"
+                              [alt]="pitcher.name + ' headshot'"
+                              (error)="hideBrokenImage($event)"
+                            />
+                            <span>{{ pitcher.name }}</span>
+                          </span>
                           <span>{{ detailText(pitcher.inningsPitched) }}</span>
                           <span>{{ detailText(pitcher.hits) }}</span>
                           <span>{{ detailText(pitcher.runs) }}</span>
@@ -202,7 +219,14 @@
                       </div>
                       @for (pitcher of game.homePitchers ?? []; track pitcher.name) {
                         <div class="stat-row">
-                          <span>{{ pitcher.name }}</span>
+                          <span class="player-cell">
+                            <img
+                              [src]="playerHeadshotUrl(pitcher.playerId)"
+                              [alt]="pitcher.name + ' headshot'"
+                              (error)="hideBrokenImage($event)"
+                            />
+                            <span>{{ pitcher.name }}</span>
+                          </span>
                           <span>{{ detailText(pitcher.inningsPitched) }}</span>
                           <span>{{ detailText(pitcher.hits) }}</span>
                           <span>{{ detailText(pitcher.runs) }}</span>
@@ -223,8 +247,15 @@
                       <div class="batter-list">
                         @for (batter of game.awayBattingLeaders ?? []; track batter.name) {
                           <div>
-                            <span class="batter-name">{{ batter.name }}</span>
-                            <span>{{ battingLine(batter) }}</span>
+                            <img
+                              [src]="playerHeadshotUrl(batter.playerId)"
+                              [alt]="batter.name + ' headshot'"
+                              (error)="hideBrokenImage($event)"
+                            />
+                            <span>
+                              <span class="batter-name">{{ batter.name }}</span>
+                              <span>{{ battingLine(batter) }}</span>
+                            </span>
                           </div>
                         }
                       </div>
@@ -239,8 +270,15 @@
                       <div class="batter-list">
                         @for (batter of game.homeBattingLeaders ?? []; track batter.name) {
                           <div>
-                            <span class="batter-name">{{ batter.name }}</span>
-                            <span>{{ battingLine(batter) }}</span>
+                            <img
+                              [src]="playerHeadshotUrl(batter.playerId)"
+                              [alt]="batter.name + ' headshot'"
+                              (error)="hideBrokenImage($event)"
+                            />
+                            <span>
+                              <span class="batter-name">{{ batter.name }}</span>
+                              <span>{{ battingLine(batter) }}</span>
+                            </span>
                           </div>
                         }
                       </div>

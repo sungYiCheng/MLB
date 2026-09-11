@@ -180,13 +180,15 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
         }
 
         return boxScoreTeam.Pitchers
-            .Select(boxScoreTeam.TryGetPlayer)
-            .Where(player => player?.Stats?.Pitching is not null)
-            .Select(player =>
+            .Select(playerId => new { PlayerId = playerId, Player = boxScoreTeam.TryGetPlayer(playerId) })
+            .Where(playerLine => playerLine.Player?.Stats?.Pitching is not null)
+            .Select(playerLine =>
             {
-                var pitching = player!.Stats!.Pitching!;
+                var player = playerLine.Player!;
+                var pitching = player.Stats!.Pitching!;
 
                 return new MlbPitcherLineDto(
+                    PlayerId: player.Person?.Id ?? playerLine.PlayerId,
                     Name: player.Person?.FullName ?? "Unknown Pitcher",
                     InningsPitched: pitching.InningsPitched,
                     Hits: pitching.Hits,
@@ -208,13 +210,15 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
         }
 
         return boxScoreTeam.Batters
-            .Select(boxScoreTeam.TryGetPlayer)
-            .Where(player => player?.Stats?.Batting is not null)
-            .Select(player =>
+            .Select(playerId => new { PlayerId = playerId, Player = boxScoreTeam.TryGetPlayer(playerId) })
+            .Where(playerLine => playerLine.Player?.Stats?.Batting is not null)
+            .Select(playerLine =>
             {
-                var batting = player!.Stats!.Batting!;
+                var player = playerLine.Player!;
+                var batting = player.Stats!.Batting!;
 
                 return new MlbBatterLineDto(
+                    PlayerId: player.Person?.Id ?? playerLine.PlayerId,
                     Name: player.Person?.FullName ?? "Unknown Batter",
                     Team: teamName,
                     AtBats: batting.AtBats,
@@ -407,6 +411,7 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
 
     private sealed class MlbPerson
     {
+        public int? Id { get; set; }
         public string? FullName { get; set; }
     }
 
