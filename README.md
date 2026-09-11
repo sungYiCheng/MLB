@@ -49,7 +49,7 @@ The API currently exposes:
 https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=YYYY-MM-DD
 ```
 
-The response includes game id, official game date, UTC game time, teams, status, and scores when MLB provides them.
+The response includes game id, official game date, UTC game time, teams, status, scores, records, probable pitchers, venue, series details, inning/count data, and line-score totals when MLB provides them.
 
 ## Next Steps
 

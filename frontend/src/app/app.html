@@ -36,29 +36,93 @@
     } @else {
       <div class="games-list">
         @for (game of games(); track game.gamePk) {
-          <article class="game-card">
-            <div class="game-meta">
-              <span class="status" [class.live]="isLive(game.status)">{{ game.status }}</span>
-              <time>{{ formatTaipeiTime(game.gameTimeUtc) }}</time>
-            </div>
-
-            <div class="matchup">
-              <div class="team away">
-                <img [src]="teamLogoUrl(game.awayTeamId)" [alt]="game.awayTeam + ' logo'" />
-                <span>{{ game.awayTeam }}</span>
+          <article class="game-card" [class.expanded]="isExpanded(game.gamePk)">
+            <button
+              type="button"
+              class="game-summary"
+              (click)="toggleGame(game.gamePk)"
+              [attr.aria-expanded]="isExpanded(game.gamePk)"
+            >
+              <div class="game-meta">
+                <span class="status" [class.live]="isLive(game.status)">{{ game.status }}</span>
+                <span class="meta-right">
+                  <time>{{ formatTaipeiTime(game.gameTimeUtc) }}</time>
+                  <span class="expand-icon" aria-hidden="true">{{ isExpanded(game.gamePk) ? '−' : '+' }}</span>
+                </span>
               </div>
 
-              <div class="score">
-                <span>{{ scoreText(game.awayScore) }}</span>
-                <span class="divider">-</span>
-                <span>{{ scoreText(game.homeScore) }}</span>
-              </div>
+              <div class="matchup">
+                <div class="team away" [class.winner]="game.awayWinner">
+                  <img [src]="teamLogoUrl(game.awayTeamId)" [alt]="game.awayTeam + ' logo'" />
+                  <span>{{ game.awayTeam }}</span>
+                </div>
 
-              <div class="team home">
-                <span>{{ game.homeTeam }}</span>
-                <img [src]="teamLogoUrl(game.homeTeamId)" [alt]="game.homeTeam + ' logo'" />
+                <div class="score">
+                  <span>{{ scoreText(game.awayScore) }}</span>
+                  <span class="divider">-</span>
+                  <span>{{ scoreText(game.homeScore) }}</span>
+                </div>
+
+                <div class="team home" [class.winner]="game.homeWinner">
+                  <span>{{ game.homeTeam }}</span>
+                  <img [src]="teamLogoUrl(game.homeTeamId)" [alt]="game.homeTeam + ' logo'" />
+                </div>
               </div>
-            </div>
+            </button>
+
+            @if (isExpanded(game.gamePk)) {
+              <div class="game-details">
+                <div class="detail-grid">
+                  <div>
+                    <span class="detail-label">Venue</span>
+                    <span class="detail-value">{{ detailText(game.venueName) }}</span>
+                  </div>
+                  <div>
+                    <span class="detail-label">Series</span>
+                    <span class="detail-value">{{ detailText(game.seriesDescription) }}</span>
+                  </div>
+                  <div>
+                    <span class="detail-label">Series Game</span>
+                    <span class="detail-value">{{ seriesText(game) }}</span>
+                  </div>
+                  <div>
+                    <span class="detail-label">Game Type</span>
+                    <span class="detail-value">{{ detailText(game.gameType) }}</span>
+                  </div>
+                  <div>
+                    <span class="detail-label">Day / Night</span>
+                    <span class="detail-value">{{ detailText(game.dayNight) }}</span>
+                  </div>
+                  <div>
+                    <span class="detail-label">Doubleheader</span>
+                    <span class="detail-value">{{ detailText(game.doubleHeader) }}</span>
+                  </div>
+                  <div>
+                    <span class="detail-label">Inning</span>
+                    <span class="detail-value">{{ inningText(game) }}</span>
+                  </div>
+                  <div>
+                    <span class="detail-label">Count</span>
+                    <span class="detail-value">{{ countText(game) }}</span>
+                  </div>
+                </div>
+
+                <div class="team-details">
+                  <div>
+                    <span class="team-detail-name">{{ game.awayTeam }}</span>
+                    <span>Record: {{ detailText(game.awayRecord) }}</span>
+                    <span>Probable pitcher: {{ pitcherText(game.awayProbablePitcher) }}</span>
+                    <span>Hits / Errors: {{ detailText(game.awayHits) }} / {{ detailText(game.awayErrors) }}</span>
+                  </div>
+                  <div>
+                    <span class="team-detail-name">{{ game.homeTeam }}</span>
+                    <span>Record: {{ detailText(game.homeRecord) }}</span>
+                    <span>Probable pitcher: {{ pitcherText(game.homeProbablePitcher) }}</span>
+                    <span>Hits / Errors: {{ detailText(game.homeHits) }} / {{ detailText(game.homeErrors) }}</span>
+                  </div>
+                </div>
+              </div>
+            }
           </article>
         }
       </div>

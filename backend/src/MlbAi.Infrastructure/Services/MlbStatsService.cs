@@ -17,7 +17,7 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
         DateOnly date,
         CancellationToken cancellationToken)
     {
-        var requestUri = $"schedule?sportId=1&date={date:yyyy-MM-dd}";
+        var requestUri = $"schedule?sportId=1&date={date:yyyy-MM-dd}&hydrate=probablePitcher,linescore";
         var response = await httpClient.GetFromJsonAsync<MlbScheduleResponse>(requestUri, cancellationToken);
 
         if (response?.Dates is null || response.Dates.Count == 0)
@@ -48,7 +48,71 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
             HomeTeam: game.Teams?.Home?.Team?.Name ?? "Unknown Home Team",
             Status: game.Status?.DetailedState ?? game.Status?.AbstractGameState ?? "Unknown",
             AwayScore: game.Teams?.Away?.Score,
-            HomeScore: game.Teams?.Home?.Score);
+            HomeScore: game.Teams?.Home?.Score,
+            AwayRecord: FormatRecord(game.Teams?.Away?.LeagueRecord),
+            HomeRecord: FormatRecord(game.Teams?.Home?.LeagueRecord),
+            AwayProbablePitcher: game.Teams?.Away?.ProbablePitcher?.FullName,
+            HomeProbablePitcher: game.Teams?.Home?.ProbablePitcher?.FullName,
+            AwayWinner: game.Teams?.Away?.IsWinner,
+            HomeWinner: game.Teams?.Home?.IsWinner,
+            VenueId: game.Venue?.Id,
+            VenueName: game.Venue?.Name,
+            GameType: FormatGameType(game.GameType),
+            DayNight: FormatTitleCase(game.DayNight),
+            ScheduledInnings: game.ScheduledInnings ?? game.Linescore?.ScheduledInnings,
+            GamesInSeries: game.GamesInSeries,
+            SeriesGameNumber: game.SeriesGameNumber,
+            SeriesDescription: game.SeriesDescription,
+            DoubleHeader: FormatDoubleHeader(game.DoubleHeader),
+            CurrentInning: game.Linescore?.CurrentInning,
+            CurrentInningOrdinal: game.Linescore?.CurrentInningOrdinal,
+            InningHalf: game.Linescore?.InningHalf ?? game.Linescore?.InningState,
+            Balls: game.Linescore?.Balls,
+            Strikes: game.Linescore?.Strikes,
+            Outs: game.Linescore?.Outs,
+            AwayHits: game.Linescore?.Teams?.Away?.Hits,
+            AwayErrors: game.Linescore?.Teams?.Away?.Errors,
+            HomeHits: game.Linescore?.Teams?.Home?.Hits,
+            HomeErrors: game.Linescore?.Teams?.Home?.Errors);
+    }
+
+    private static string? FormatRecord(MlbLeagueRecord? record)
+    {
+        return record is null
+            ? null
+            : $"{record.Wins}-{record.Losses}";
+    }
+
+    private static string? FormatGameType(string? gameType)
+    {
+        return gameType switch
+        {
+            "R" => "Regular Season",
+            "S" => "Spring Training",
+            "F" => "Wild Card",
+            "D" => "Division Series",
+            "L" => "League Championship",
+            "W" => "World Series",
+            _ => gameType
+        };
+    }
+
+    private static string? FormatDoubleHeader(string? doubleHeader)
+    {
+        return doubleHeader switch
+        {
+            "N" => "No",
+            "Y" => "Yes",
+            "S" => "Split",
+            _ => doubleHeader
+        };
+    }
+
+    private static string? FormatTitleCase(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? null
+            : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.ToLowerInvariant());
     }
 
     private static DateOnly? ParseDateOnly(string? value)
@@ -109,8 +173,17 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
         public int GamePk { get; set; }
         public string? GameDate { get; set; }
         public string? OfficialDate { get; set; }
+        public string? GameType { get; set; }
+        public string? DayNight { get; set; }
+        public int? ScheduledInnings { get; set; }
+        public int? GamesInSeries { get; set; }
+        public int? SeriesGameNumber { get; set; }
+        public string? SeriesDescription { get; set; }
+        public string? DoubleHeader { get; set; }
         public MlbGameStatus? Status { get; set; }
         public MlbGameTeams? Teams { get; set; }
+        public MlbVenue? Venue { get; set; }
+        public MlbLinescore? Linescore { get; set; }
     }
 
     private sealed class MlbGameStatus
@@ -128,6 +201,9 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
     private sealed class MlbGameTeamSlot
     {
         public int? Score { get; set; }
+        public bool? IsWinner { get; set; }
+        public MlbLeagueRecord? LeagueRecord { get; set; }
+        public MlbPerson? ProbablePitcher { get; set; }
         public MlbTeam? Team { get; set; }
     }
 
@@ -135,5 +211,47 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
     {
         public int? Id { get; set; }
         public string? Name { get; set; }
+    }
+
+    private sealed class MlbVenue
+    {
+        public int? Id { get; set; }
+        public string? Name { get; set; }
+    }
+
+    private sealed class MlbLeagueRecord
+    {
+        public int Wins { get; set; }
+        public int Losses { get; set; }
+    }
+
+    private sealed class MlbPerson
+    {
+        public string? FullName { get; set; }
+    }
+
+    private sealed class MlbLinescore
+    {
+        public int? CurrentInning { get; set; }
+        public string? CurrentInningOrdinal { get; set; }
+        public string? InningState { get; set; }
+        public string? InningHalf { get; set; }
+        public int? ScheduledInnings { get; set; }
+        public int? Balls { get; set; }
+        public int? Strikes { get; set; }
+        public int? Outs { get; set; }
+        public MlbLinescoreTeams? Teams { get; set; }
+    }
+
+    private sealed class MlbLinescoreTeams
+    {
+        public MlbLineScoreTeam? Away { get; set; }
+        public MlbLineScoreTeam? Home { get; set; }
+    }
+
+    private sealed class MlbLineScoreTeam
+    {
+        public int? Hits { get; set; }
+        public int? Errors { get; set; }
     }
 }

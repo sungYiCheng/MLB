@@ -10,6 +10,7 @@ export class App implements OnInit {
   private readonly http = inject(HttpClient);
 
   protected readonly games = signal<MlbGame[]>([]);
+  protected readonly expandedGameIds = signal<ReadonlySet<string>>(new Set());
   protected readonly isLoading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
 
@@ -46,6 +47,24 @@ export class App implements OnInit {
     return normalizedStatus.includes('progress') || normalizedStatus.includes('warmup');
   }
 
+  protected toggleGame(gamePk: string): void {
+    this.expandedGameIds.update((expandedGameIds) => {
+      const nextExpandedGameIds = new Set(expandedGameIds);
+
+      if (nextExpandedGameIds.has(gamePk)) {
+        nextExpandedGameIds.delete(gamePk);
+      } else {
+        nextExpandedGameIds.add(gamePk);
+      }
+
+      return nextExpandedGameIds;
+    });
+  }
+
+  protected isExpanded(gamePk: string): boolean {
+    return this.expandedGameIds().has(gamePk);
+  }
+
   protected formatTaipeiTime(value: string | null): string {
     if (!value) {
       return 'Time TBD';
@@ -63,6 +82,38 @@ export class App implements OnInit {
     return score === null ? '-' : score.toString();
   }
 
+  protected detailText(value: string | number | null | undefined): string {
+    return value === null || value === undefined || value === '' ? '-' : value.toString();
+  }
+
+  protected seriesText(game: MlbGame): string {
+    if (game.seriesGameNumber && game.gamesInSeries) {
+      return `Game ${game.seriesGameNumber} of ${game.gamesInSeries}`;
+    }
+
+    return '-';
+  }
+
+  protected inningText(game: MlbGame): string {
+    if (!game.currentInningOrdinal) {
+      return game.scheduledInnings ? `${game.scheduledInnings} innings` : '-';
+    }
+
+    return game.inningHalf ? `${game.inningHalf} ${game.currentInningOrdinal}` : game.currentInningOrdinal;
+  }
+
+  protected countText(game: MlbGame): string {
+    if (game.balls === null || game.strikes === null || game.outs === null) {
+      return '-';
+    }
+
+    return `${game.balls}-${game.strikes}, ${game.outs} out${game.outs === 1 ? '' : 's'}`;
+  }
+
+  protected pitcherText(value: string | null): string {
+    return value ?? 'TBD';
+  }
+
   protected teamLogoUrl(teamId: number | null): string {
     return teamId
       ? `https://www.mlbstatic.com/team-logos/${teamId}.svg`
@@ -76,9 +127,34 @@ interface MlbGame {
   gameTimeUtc: string | null;
   awayTeamId: number | null;
   awayTeam: string;
+  awayRecord: string | null;
+  awayProbablePitcher: string | null;
+  awayWinner: boolean | null;
   homeTeamId: number | null;
   homeTeam: string;
+  homeRecord: string | null;
+  homeProbablePitcher: string | null;
+  homeWinner: boolean | null;
   status: string;
   awayScore: number | null;
   homeScore: number | null;
+  venueId: number | null;
+  venueName: string | null;
+  gameType: string | null;
+  dayNight: string | null;
+  scheduledInnings: number | null;
+  gamesInSeries: number | null;
+  seriesGameNumber: number | null;
+  seriesDescription: string | null;
+  doubleHeader: string | null;
+  currentInning: number | null;
+  currentInningOrdinal: string | null;
+  inningHalf: string | null;
+  balls: number | null;
+  strikes: number | null;
+  outs: number | null;
+  awayHits: number | null;
+  awayErrors: number | null;
+  homeHits: number | null;
+  homeErrors: number | null;
 }
