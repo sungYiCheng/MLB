@@ -53,6 +53,14 @@ public sealed record MlbPitcherLineDto(
     int? StrikeOuts,
     int? Walks,
     int? Pitches,
+    int? SeasonWins,
+    int? SeasonLosses,
+    string? SeasonEra,
+    string? SeasonWhip,
+    int? SeasonStrikeOuts,
+    string? SeasonInningsPitched,
+    int? SeasonSaves,
+    int? SeasonGamesPitched,
     string? Summary);
 
 public sealed record MlbBatterLineDto(
@@ -68,4 +76,64 @@ public sealed record MlbBatterLineDto(
     int? Rbi,
     int? Walks,
     int? StrikeOuts,
+    string? SeasonAverage,
+    string? SeasonOnBasePercentage,
+    string? SeasonSluggingPercentage,
+    string? SeasonOps,
+    int? SeasonHomeRuns,
+    int? SeasonRbi,
+    int? SeasonHits,
+    int? SeasonStolenBases,
     string? Summary);
+
+public sealed record MlbStandingsDto(
+    IReadOnlyList<MlbLeagueStandingsDto> Leagues,
+    IReadOnlyList<MlbWildCardStandingsDto> WildCards,
+    DateTimeOffset? LastUpdatedUtc);
+
+public sealed record MlbLeagueStandingsDto(
+    int LeagueId,
+    string LeagueName,
+    IReadOnlyList<MlbDivisionStandingsDto> Divisions);
+
+public sealed record MlbDivisionStandingsDto(
+    int DivisionId,
+    string DivisionName,
+    IReadOnlyList<MlbTeamStandingDto> Teams);
+
+public sealed record MlbWildCardStandingsDto(
+    int LeagueId,
+    string LeagueName,
+    IReadOnlyList<MlbTeamStandingDto> Teams);
+
+public sealed record MlbTeamStandingDto(
+    int? TeamId,
+    string TeamName,
+    int Wins,
+    int Losses,
+    string? WinningPercentage,
+    string? Rank,
+    string? GamesBack,
+    string? WildCardGamesBack,
+    string? Streak,
+    string? LastTen,
+    int? RunDifferential);
+
+public sealed record MlbStatLeadersDto(
+    IReadOnlyList<MlbStatLeaderCategoryDto> Categories);
+
+public sealed record MlbStatLeaderCategoryDto(
+    string CategoryKey,
+    string Label,
+    string StatGroup,
+    string Unit,
+    IReadOnlyList<MlbStatLeaderDto> Leaders);
+
+public sealed record MlbStatLeaderDto(
+    int Rank,
+    string Value,
+    int? PlayerId,
+    string PlayerName,
+    int? TeamId,
+    string TeamName,
+    string? LeagueName);

@@ -37,4 +37,50 @@ app.MapGet("/api/games/today", async (IMlbService mlbService, CancellationToken 
     }
 });
 
+app.MapGet("/api/standings", async (IMlbService mlbService, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var standings = await mlbService.GetStandingsAsync(cancellationToken);
+        return Results.Ok(standings);
+    }
+    catch (HttpRequestException ex)
+    {
+        return Results.Problem(
+            title: "MLB Stats API unavailable",
+            detail: app.Environment.IsDevelopment() ? ex.Message : null,
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+    {
+        return Results.Problem(
+            title: "MLB Stats API timeout",
+            detail: app.Environment.IsDevelopment() ? ex.Message : null,
+            statusCode: StatusCodes.Status504GatewayTimeout);
+    }
+});
+
+app.MapGet("/api/stat-leaders", async (IMlbService mlbService, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var leaders = await mlbService.GetStatLeadersAsync(cancellationToken);
+        return Results.Ok(leaders);
+    }
+    catch (HttpRequestException ex)
+    {
+        return Results.Problem(
+            title: "MLB Stats API unavailable",
+            detail: app.Environment.IsDevelopment() ? ex.Message : null,
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+    {
+        return Results.Problem(
+            title: "MLB Stats API timeout",
+            detail: app.Environment.IsDevelopment() ? ex.Message : null,
+            statusCode: StatusCodes.Status504GatewayTimeout);
+    }
+});
+
 app.Run();

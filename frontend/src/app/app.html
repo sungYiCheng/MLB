@@ -3,7 +3,7 @@
     <header class="topbar">
       <div class="title-stack">
         <p class="eyebrow">MLB AI Daily</p>
-        <h1>Today's MLB Games</h1>
+        <h1>Taiwan Today's MLB Games</h1>
       </div>
 
       <button type="button" class="refresh-button" (click)="loadGames()" [disabled]="isLoading()">
@@ -27,91 +27,285 @@
       </div>
     </div>
 
-    @if (isLoading()) {
-      <div class="state-panel">Loading today's schedule...</div>
-    } @else if (errorMessage()) {
-      <div class="state-panel error">{{ errorMessage() }}</div>
-    } @else if (games().length === 0) {
-      <div class="state-panel">No MLB games are scheduled for today.</div>
-    } @else {
-      <div class="games-list">
-        @for (game of games(); track game.gamePk) {
-          <article class="game-card" [class.expanded]="isExpanded(game.gamePk)">
-            <button
-              type="button"
-              class="game-summary"
-              (click)="toggleGame(game.gamePk)"
-              [attr.aria-expanded]="isExpanded(game.gamePk)"
-            >
-              <div class="game-meta">
-                <span class="status" [class.live]="isLive(game.status)">{{ game.status }}</span>
-                <span class="meta-right">
-                  <time>{{ formatTaipeiTime(game.gameTimeUtc) }}</time>
-                  <span class="expand-icon" aria-hidden="true">{{ isExpanded(game.gamePk) ? '−' : '+' }}</span>
-                </span>
-              </div>
+    @if (statLeaders(); as currentLeaders) {
+      <section class="dashboard-section leaders-board" aria-label="MLB stat leaders">
+        <button
+          type="button"
+          class="section-toggle"
+          (click)="toggleSection('leaders')"
+          [attr.aria-expanded]="isSectionExpanded('leaders')"
+        >
+          <span>
+            <span class="section-kicker">League Leaders</span>
+            <span class="section-title">MLB Stat Leaders</span>
+          </span>
+          <span class="toggle-copy">
+            <span>Top three</span>
+            <span class="expand-icon" aria-hidden="true">
+              {{ isSectionExpanded('leaders') ? '−' : '+' }}
+            </span>
+          </span>
+        </button>
 
-              <div class="matchup">
-                <div class="team away" [class.winner]="game.awayWinner">
-                  <img [src]="teamLogoUrl(game.awayTeamId)" [alt]="game.awayTeam + ' logo'" />
-                  <span class="team-copy">
-                    <span class="team-name">{{ game.awayTeam }}</span>
-                    <span class="team-record">Record {{ detailText(game.awayRecord) }}</span>
-                  </span>
+        @if (isSectionExpanded('leaders')) {
+          <div class="leader-grid">
+            @for (category of currentLeaders.categories; track category.categoryKey) {
+              <article
+                class="leader-card"
+                [class.hitting-leader]="category.statGroup === 'hitting'"
+                [class.pitching-leader]="category.statGroup === 'pitching'"
+              >
+                <div class="leader-card-heading">
+                  <span>{{ category.label }}</span>
+                  <span>{{ category.unit }}</span>
                 </div>
 
-                <div class="score">
-                  <span>{{ scoreText(game.awayScore) }}</span>
-                  <span class="divider">-</span>
-                  <span>{{ scoreText(game.homeScore) }}</span>
+                <div class="leader-list">
+                  @for (leader of category.leaders; track leader.playerId ?? leader.playerName) {
+                    <div class="leader-row">
+                      <span class="rank-badge">{{ leader.rank }}</span>
+                      <img
+                        [src]="playerHeadshotUrl(leader.playerId)"
+                        [alt]="leader.playerName + ' headshot'"
+                        (error)="hideBrokenImage($event)"
+                      />
+                      <span class="leader-player">
+                        <span>{{ leader.playerName }}</span>
+                        <span>{{ leader.teamName }} · {{ detailText(leader.leagueName) }}</span>
+                      </span>
+                      <span class="leader-value">{{ leader.value }}</span>
+                    </div>
+                  }
                 </div>
+              </article>
+            }
+          </div>
+        }
+      </section>
+    }
 
-                <div class="team home" [class.winner]="game.homeWinner">
-                  <span class="team-copy">
-                    <span class="team-name">{{ game.homeTeam }}</span>
-                    <span class="team-record">Record {{ detailText(game.homeRecord) }}</span>
-                  </span>
-                  <img [src]="teamLogoUrl(game.homeTeamId)" [alt]="game.homeTeam + ' logo'" />
-                </div>
-              </div>
-            </button>
+    @if (standings(); as currentStandings) {
+      <section class="dashboard-section standings-board" aria-label="MLB standings">
+        <button
+          type="button"
+          class="section-toggle"
+          (click)="toggleSection('divisionStandings')"
+          [attr.aria-expanded]="isSectionExpanded('divisionStandings')"
+        >
+          <span class="section-heading">
+            <span class="section-kicker">League Table</span>
+            <span class="section-title">Division Standings</span>
+          </span>
+          <span class="toggle-copy">
+            <span>Updated {{ formatTaipeiTime(currentStandings.lastUpdatedUtc) }}</span>
+            <span class="expand-icon" aria-hidden="true">
+              {{ isSectionExpanded('divisionStandings') ? '−' : '+' }}
+            </span>
+          </span>
+        </button>
 
-            @if (isExpanded(game.gamePk)) {
-              <div class="game-details">
-                <div class="detail-grid">
-                  <div>
-                    <span class="detail-label">Venue</span>
-                    <span class="detail-value">{{ detailText(game.venueName) }}</span>
-                  </div>
-                  <div>
-                    <span class="detail-label">Series</span>
-                    <span class="detail-value">{{ detailText(game.seriesDescription) }}</span>
-                  </div>
-                  <div>
-                    <span class="detail-label">Series Game</span>
-                    <span class="detail-value">{{ seriesText(game) }}</span>
-                  </div>
-                  <div>
-                    <span class="detail-label">Game Type</span>
-                    <span class="detail-value">{{ detailText(game.gameType) }}</span>
-                  </div>
-                  <div>
-                    <span class="detail-label">Day / Night</span>
-                    <span class="detail-value">{{ detailText(game.dayNight) }}</span>
-                  </div>
-                  <div>
-                    <span class="detail-label">Doubleheader</span>
-                    <span class="detail-value">{{ detailText(game.doubleHeader) }}</span>
-                  </div>
-                  <div>
-                    <span class="detail-label">Inning</span>
-                    <span class="detail-value">{{ inningText(game) }}</span>
-                  </div>
-                  <div>
-                    <span class="detail-label">Count</span>
-                    <span class="detail-value">{{ countText(game) }}</span>
-                  </div>
+        @if (isSectionExpanded('divisionStandings')) {
+          <div class="league-grid">
+            @for (league of currentStandings.leagues; track league.leagueId) {
+              <section class="standings-panel">
+                <h3>{{ league.leagueName }}</h3>
+                <div class="division-grid">
+                  @for (division of league.divisions; track division.divisionId) {
+                    <article class="division-card">
+                      <h4>{{ division.divisionName }}</h4>
+                      <div class="standing-table">
+                        <div class="standing-header">
+                          <span>Team</span>
+                          <span>W-L</span>
+                          <span>PCT</span>
+                          <span>GB</span>
+                          <span>L10</span>
+                        </div>
+                        @for (team of division.teams; track team.teamId ?? team.teamName) {
+                          <div class="standing-row">
+                            <span class="standing-team">
+                              <img [src]="teamLogoUrl(team.teamId)" [alt]="team.teamName + ' logo'" />
+                              <span>
+                                <span>{{ team.teamName }}</span>
+                                <span>{{ detailText(team.streak) }} · RD {{ detailText(team.runDifferential) }}</span>
+                              </span>
+                            </span>
+                            <span>{{ recordText(team) }}</span>
+                            <span>{{ detailText(team.winningPercentage) }}</span>
+                            <span>{{ gamesBackText(team.gamesBack) }}</span>
+                            <span>{{ detailText(team.lastTen) }}</span>
+                          </div>
+                        }
+                      </div>
+                    </article>
+                  }
                 </div>
+              </section>
+            }
+          </div>
+        }
+
+        <button
+          type="button"
+          class="section-toggle wild-card-heading"
+          (click)="toggleSection('wildCard')"
+          [attr.aria-expanded]="isSectionExpanded('wildCard')"
+        >
+          <span class="section-heading">
+            <span class="section-kicker">Postseason Chase</span>
+            <span class="section-title">Wild Card Race</span>
+          </span>
+          <span class="toggle-copy">
+            <span>Top eight shown</span>
+            <span class="expand-icon" aria-hidden="true">
+              {{ isSectionExpanded('wildCard') ? '−' : '+' }}
+            </span>
+          </span>
+        </button>
+
+        @if (isSectionExpanded('wildCard')) {
+          <div class="wild-card-grid">
+            @for (wildCard of currentStandings.wildCards; track wildCard.leagueId) {
+              <section class="standings-panel">
+                <h3>{{ wildCard.leagueName }}</h3>
+                <div class="standing-table wild-card-table">
+                  <div class="standing-header">
+                    <span>Rank</span>
+                    <span>Team</span>
+                    <span>W-L</span>
+                    <span>PCT</span>
+                    <span>WCGB</span>
+                    <span>L10</span>
+                  </div>
+                  @for (team of wildCard.teams.slice(0, 8); track team.teamId ?? team.teamName) {
+                    <div class="standing-row">
+                      <span class="rank-badge">{{ detailText(team.rank) }}</span>
+                      <span class="standing-team">
+                        <img [src]="teamLogoUrl(team.teamId)" [alt]="team.teamName + ' logo'" />
+                        <span>
+                          <span>{{ team.teamName }}</span>
+                          <span>{{ detailText(team.streak) }} · RD {{ detailText(team.runDifferential) }}</span>
+                        </span>
+                      </span>
+                      <span>{{ recordText(team) }}</span>
+                      <span>{{ detailText(team.winningPercentage) }}</span>
+                      <span>{{ gamesBackText(team.wildCardGamesBack) }}</span>
+                      <span>{{ detailText(team.lastTen) }}</span>
+                    </div>
+                  }
+                </div>
+              </section>
+            }
+          </div>
+        }
+      </section>
+    }
+
+    <div class="dashboard-section games-board">
+      <button
+        type="button"
+        class="section-toggle"
+        (click)="toggleSection('games')"
+        [attr.aria-expanded]="isSectionExpanded('games')"
+      >
+        <span>
+          <span class="section-kicker">Daily Board</span>
+          <span class="section-title">Taiwan Today's Games</span>
+        </span>
+        <span class="toggle-copy">
+          <span>{{ totalGames() }} games</span>
+          <span class="expand-icon" aria-hidden="true">
+            {{ isSectionExpanded('games') ? '−' : '+' }}
+          </span>
+        </span>
+      </button>
+
+      @if (isSectionExpanded('games')) {
+        @if (isLoading()) {
+          <div class="state-panel">Loading Taiwan today's schedule...</div>
+        } @else if (errorMessage()) {
+          <div class="state-panel error">{{ errorMessage() }}</div>
+        } @else if (games().length === 0) {
+          <div class="state-panel">No MLB games are scheduled for Taiwan today.</div>
+        } @else {
+          <div class="games-list">
+            @for (game of games(); track game.gamePk) {
+              <article class="game-card" [class.expanded]="isExpanded(game.gamePk)">
+                <button
+                  type="button"
+                  class="game-summary"
+                  (click)="toggleGame(game.gamePk)"
+                  [attr.aria-expanded]="isExpanded(game.gamePk)"
+                >
+                  <div class="game-meta">
+                    <span class="status" [class.live]="isLive(game.status)">{{ game.status }}</span>
+                    <span class="meta-right">
+                      <time>{{ formatTaipeiTime(game.gameTimeUtc) }}</time>
+                      <span class="expand-icon" aria-hidden="true">{{ isExpanded(game.gamePk) ? '−' : '+' }}</span>
+                    </span>
+                  </div>
+
+                  <div class="matchup">
+                    <div class="team away" [class.winner]="game.awayWinner">
+                      <img [src]="teamLogoUrl(game.awayTeamId)" [alt]="game.awayTeam + ' logo'" />
+                      <span class="team-copy">
+                        <span class="team-name">{{ game.awayTeam }}</span>
+                        <span class="team-record">Record {{ detailText(game.awayRecord) }}</span>
+                      </span>
+                    </div>
+
+                    <div class="score">
+                      <span>{{ scoreText(game.awayScore) }}</span>
+                      <span class="divider">-</span>
+                      <span>{{ scoreText(game.homeScore) }}</span>
+                    </div>
+
+                    <div class="team home" [class.winner]="game.homeWinner">
+                      <span class="team-copy">
+                        <span class="team-name">{{ game.homeTeam }}</span>
+                        <span class="team-record">Record {{ detailText(game.homeRecord) }}</span>
+                      </span>
+                      <img [src]="teamLogoUrl(game.homeTeamId)" [alt]="game.homeTeam + ' logo'" />
+                    </div>
+                  </div>
+                </button>
+
+                @if (isExpanded(game.gamePk)) {
+                  <div class="game-details">
+                    <div class="detail-grid">
+                      <div>
+                        <span class="detail-label">Venue</span>
+                        <span class="detail-value">{{ detailText(game.venueName) }}</span>
+                      </div>
+                      <div>
+                        <span class="detail-label">Series</span>
+                        <span class="detail-value">{{ detailText(game.seriesDescription) }}</span>
+                      </div>
+                      <div>
+                        <span class="detail-label">Series Game</span>
+                        <span class="detail-value">{{ seriesText(game) }}</span>
+                      </div>
+                      <div>
+                        <span class="detail-label">Game Type</span>
+                        <span class="detail-value">{{ detailText(game.gameType) }}</span>
+                      </div>
+                      <div>
+                        <span class="detail-label">Day / Night</span>
+                        <span class="detail-value">{{ detailText(game.dayNight) }}</span>
+                      </div>
+                      <div>
+                        <span class="detail-label">Doubleheader</span>
+                        <span class="detail-value">{{ detailText(game.doubleHeader) }}</span>
+                      </div>
+                      <div>
+                        <span class="detail-label">Inning</span>
+                        <span class="detail-value">{{ inningText(game) }}</span>
+                      </div>
+                      <div>
+                        <span class="detail-label">Count</span>
+                        <span class="detail-value">{{ countText(game) }}</span>
+                      </div>
+                    </div>
 
                 <div class="team-details">
                   <div>
@@ -189,7 +383,10 @@
                               [alt]="pitcher.name + ' headshot'"
                               (error)="hideBrokenImage($event)"
                             />
-                            <span>{{ pitcher.name }}</span>
+                            <span class="player-stack">
+                              <span>{{ pitcher.name }}</span>
+                              <span>{{ pitcherSeasonLine(pitcher) }}</span>
+                            </span>
                           </span>
                           <span>{{ detailText(pitcher.inningsPitched) }}</span>
                           <span>{{ detailText(pitcher.hits) }}</span>
@@ -225,7 +422,10 @@
                               [alt]="pitcher.name + ' headshot'"
                               (error)="hideBrokenImage($event)"
                             />
-                            <span>{{ pitcher.name }}</span>
+                            <span class="player-stack">
+                              <span>{{ pitcher.name }}</span>
+                              <span>{{ pitcherSeasonLine(pitcher) }}</span>
+                            </span>
                           </span>
                           <span>{{ detailText(pitcher.inningsPitched) }}</span>
                           <span>{{ detailText(pitcher.hits) }}</span>
@@ -242,7 +442,7 @@
 
                 <div class="split-panels">
                   <section class="insight-panel">
-                    <h2>{{ game.awayTeam }} Batting Notes</h2>
+                    <h2>{{ game.awayTeam }} Batters</h2>
                     @if (hasList(game.awayBattingLeaders)) {
                       <div class="batter-list">
                         @for (batter of game.awayBattingLeaders ?? []; track batter.name) {
@@ -255,6 +455,7 @@
                             <span>
                               <span class="batter-name">{{ batter.name }}</span>
                               <span>{{ battingLine(batter) }}</span>
+                              <span class="season-line">{{ batterSeasonLine(batter) }}</span>
                             </span>
                           </div>
                         }
@@ -265,7 +466,7 @@
                   </section>
 
                   <section class="insight-panel">
-                    <h2>{{ game.homeTeam }} Batting Notes</h2>
+                    <h2>{{ game.homeTeam }} Batters</h2>
                     @if (hasList(game.homeBattingLeaders)) {
                       <div class="batter-list">
                         @for (batter of game.homeBattingLeaders ?? []; track batter.name) {
@@ -278,6 +479,7 @@
                             <span>
                               <span class="batter-name">{{ batter.name }}</span>
                               <span>{{ battingLine(batter) }}</span>
+                              <span class="season-line">{{ batterSeasonLine(batter) }}</span>
                             </span>
                           </div>
                         }
@@ -293,5 +495,7 @@
         }
       </div>
     }
+      }
+    </div>
   </section>
 </main>

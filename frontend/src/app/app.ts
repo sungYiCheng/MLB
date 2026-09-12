@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-root',
@@ -10,7 +11,12 @@ export class App implements OnInit {
   private readonly http = inject(HttpClient);
 
   protected readonly games = signal<MlbGame[]>([]);
+  protected readonly standings = signal<MlbStandings | null>(null);
+  protected readonly statLeaders = signal<MlbStatLeaders | null>(null);
   protected readonly expandedGameIds = signal<ReadonlySet<string>>(new Set());
+  protected readonly expandedSections = signal<ReadonlySet<SectionKey>>(
+    new Set(['leaders', 'divisionStandings', 'wildCard', 'games'])
+  );
   protected readonly isLoading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
 
@@ -30,13 +36,19 @@ export class App implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set(null);
 
-    this.http.get<MlbGame[]>('/api/games/today').subscribe({
-      next: (games) => {
+    forkJoin({
+      games: this.http.get<MlbGame[]>('/api/games/today'),
+      standings: this.http.get<MlbStandings>('/api/standings'),
+      statLeaders: this.http.get<MlbStatLeaders>('/api/stat-leaders')
+    }).subscribe({
+      next: ({ games, standings, statLeaders }) => {
         this.games.set(games);
+        this.standings.set(standings);
+        this.statLeaders.set(statLeaders);
         this.isLoading.set(false);
       },
       error: () => {
-        this.errorMessage.set('Could not load the MLB schedule. Check that the backend API is running.');
+        this.errorMessage.set('Could not load MLB data. Check that the backend API is running.');
         this.isLoading.set(false);
       }
     });
@@ -63,6 +75,24 @@ export class App implements OnInit {
 
   protected isExpanded(gamePk: string): boolean {
     return this.expandedGameIds().has(gamePk);
+  }
+
+  protected toggleSection(sectionKey: SectionKey): void {
+    this.expandedSections.update((expandedSections) => {
+      const nextExpandedSections = new Set(expandedSections);
+
+      if (nextExpandedSections.has(sectionKey)) {
+        nextExpandedSections.delete(sectionKey);
+      } else {
+        nextExpandedSections.add(sectionKey);
+      }
+
+      return nextExpandedSections;
+    });
+  }
+
+  protected isSectionExpanded(sectionKey: SectionKey): boolean {
+    return this.expandedSections().has(sectionKey);
   }
 
   protected formatTaipeiTime(value: string | null): string {
@@ -132,6 +162,37 @@ export class App implements OnInit {
       `${this.detailText(batter.walks)} BB`,
       `${this.detailText(batter.strikeOuts)} K`
     ].join(' · ');
+  }
+
+  protected batterSeasonLine(batter: MlbBatterLine): string {
+    return [
+      `AVG ${this.detailText(batter.seasonAverage)}`,
+      `OBP ${this.detailText(batter.seasonOnBasePercentage)}`,
+      `SLG ${this.detailText(batter.seasonSluggingPercentage)}`,
+      `OPS ${this.detailText(batter.seasonOps)}`,
+      `${this.detailText(batter.seasonHomeRuns)} HR`,
+      `${this.detailText(batter.seasonRbi)} RBI`,
+      `${this.detailText(batter.seasonStolenBases)} SB`
+    ].join(' · ');
+  }
+
+  protected pitcherSeasonLine(pitcher: MlbPitcherLine): string {
+    return [
+      `${this.detailText(pitcher.seasonWins)}-${this.detailText(pitcher.seasonLosses)}`,
+      `ERA ${this.detailText(pitcher.seasonEra)}`,
+      `WHIP ${this.detailText(pitcher.seasonWhip)}`,
+      `${this.detailText(pitcher.seasonStrikeOuts)} K`,
+      `${this.detailText(pitcher.seasonInningsPitched)} IP`,
+      `${this.detailText(pitcher.seasonSaves)} SV`
+    ].join(' · ');
+  }
+
+  protected recordText(team: MlbTeamStanding): string {
+    return `${team.wins}-${team.losses}`;
+  }
+
+  protected gamesBackText(value: string | null): string {
+    return value === null || value === '' ? '-' : value;
   }
 
   protected teamLogoUrl(teamId: number | null): string {
@@ -209,6 +270,14 @@ interface MlbPitcherLine {
   strikeOuts: number | null;
   walks: number | null;
   pitches: number | null;
+  seasonWins: number | null;
+  seasonLosses: number | null;
+  seasonEra: string | null;
+  seasonWhip: string | null;
+  seasonStrikeOuts: number | null;
+  seasonInningsPitched: string | null;
+  seasonSaves: number | null;
+  seasonGamesPitched: number | null;
   summary: string | null;
 }
 
@@ -225,5 +294,75 @@ interface MlbBatterLine {
   rbi: number | null;
   walks: number | null;
   strikeOuts: number | null;
+  seasonAverage: string | null;
+  seasonOnBasePercentage: string | null;
+  seasonSluggingPercentage: string | null;
+  seasonOps: string | null;
+  seasonHomeRuns: number | null;
+  seasonRbi: number | null;
+  seasonHits: number | null;
+  seasonStolenBases: number | null;
   summary: string | null;
 }
+
+interface MlbStandings {
+  leagues: MlbLeagueStandings[];
+  wildCards: MlbWildCardStandings[];
+  lastUpdatedUtc: string | null;
+}
+
+interface MlbLeagueStandings {
+  leagueId: number;
+  leagueName: string;
+  divisions: MlbDivisionStandings[];
+}
+
+interface MlbDivisionStandings {
+  divisionId: number;
+  divisionName: string;
+  teams: MlbTeamStanding[];
+}
+
+interface MlbWildCardStandings {
+  leagueId: number;
+  leagueName: string;
+  teams: MlbTeamStanding[];
+}
+
+interface MlbTeamStanding {
+  teamId: number | null;
+  teamName: string;
+  wins: number;
+  losses: number;
+  winningPercentage: string | null;
+  rank: string | null;
+  gamesBack: string | null;
+  wildCardGamesBack: string | null;
+  streak: string | null;
+  lastTen: string | null;
+  runDifferential: number | null;
+}
+
+interface MlbStatLeaders {
+  categories: MlbStatLeaderCategory[];
+}
+
+interface MlbStatLeaderCategory {
+  categoryKey: string;
+  label: string;
+  statGroup: string;
+  unit: string;
+  leaders: MlbStatLeader[];
+}
+
+interface MlbStatLeader {
+  rank: number;
+  value: string;
+  playerId: number | null;
+  playerName: string;
+  teamId: number | null;
+  teamName: string;
+  leagueName: string | null;
+}
+
+type SectionKey = 'leaders' | 'divisionStandings' | 'wildCard' | 'games';
