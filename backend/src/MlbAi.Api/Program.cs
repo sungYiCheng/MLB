@@ -10,7 +10,20 @@ builder.Services
         client.Timeout = TimeSpan.FromSeconds(10);
     });
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
+
+app.UseCors();
 
 app.MapGet("/", () => Results.Ok(new { name = "MLB AI Daily API", status = "ready" }));
 

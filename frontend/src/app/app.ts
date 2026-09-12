@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { forkJoin } from 'rxjs';
+import { environment } from '../environments/environment';
 
 @Component({
   selector: 'app-root',
@@ -37,9 +38,9 @@ export class App implements OnInit {
     this.errorMessage.set(null);
 
     forkJoin({
-      games: this.http.get<MlbGame[]>('/api/games/today'),
-      standings: this.http.get<MlbStandings>('/api/standings'),
-      statLeaders: this.http.get<MlbStatLeaders>('/api/stat-leaders')
+      games: this.http.get<MlbGame[]>(this.apiUrl('/api/games/today')),
+      standings: this.http.get<MlbStandings>(this.apiUrl('/api/standings')),
+      statLeaders: this.http.get<MlbStatLeaders>(this.apiUrl('/api/stat-leaders'))
     }).subscribe({
       next: ({ games, standings, statLeaders }) => {
         this.games.set(games);
@@ -57,6 +58,10 @@ export class App implements OnInit {
   protected isLive(status: string): boolean {
     const normalizedStatus = status.toLowerCase();
     return normalizedStatus.includes('progress') || normalizedStatus.includes('warmup');
+  }
+
+  private apiUrl(path: string): string {
+    return `${environment.apiBaseUrl}${path}`;
   }
 
   protected toggleGame(gamePk: string): void {

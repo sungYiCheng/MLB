@@ -29,6 +29,39 @@ dotnet build backend\MlbAi.sln
 dotnet run --project backend\src\MlbAi.Api\MlbAi.Api.csproj
 ```
 
+## Container Build
+
+The backend includes a Dockerfile for cloud builds:
+
+```text
+backend/Dockerfile
+```
+
+The container listens on port `8080`.
+
+This repo is prepared to build the backend image in Azure, so local Docker Desktop is optional for the CI/CD path.
+The Azure pipeline uses ACR Tasks to build and push the image from the Dockerfile without requiring Docker on this computer.
+
+The current Azure development backend is:
+
+```text
+https://ca-mlb-ai-api.wonderfulpond-0bfd6efa.eastasia.azurecontainerapps.io
+```
+
+The current Azure development frontend is:
+
+```text
+https://yellow-forest-04081e300.5.azurestaticapps.net
+```
+
+Before running the pipeline, update these variables in `azure-pipelines.yml`:
+
+```yaml
+azureServiceConnection: 'TODO-AZURE-SERVICE-CONNECTION'
+acrName: 'acrmlbaigo'
+imageRepository: 'mlb-ai-api'
+```
+
 ## Frontend Commands
 
 ```powershell
@@ -53,6 +86,8 @@ The response includes game id, official game date, UTC game time, teams, status,
 
 ## Next Steps
 
-1. Add richer game details and daily analysis.
-2. Improve loading/error states after the API shape settles.
-3. Add deployment files for Azure Static Web Apps and Azure Container Apps when the app shape is clearer.
+1. Create an Azure DevOps Azure Resource Manager service connection.
+2. Replace the `azureServiceConnection` placeholder in `azure-pipelines.yml`.
+3. Wire the Angular production API URL to the Azure Container Apps backend.
+4. Deploy the frontend to Azure Static Web Apps.
+5. Move the same image flow to AKS when ready.
