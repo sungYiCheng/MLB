@@ -53,6 +53,8 @@ backend/tests/MlbAi.Application.Tests
 
 Pipeline 裡的 `Validate` stage 會先跑 `dotnet test`。如果 unit test 失敗，就不會繼續 build image 或 deploy。
 
+Docker image build 只 restore/publish `MlbAi.Api` 專案，不把 test project 放進 runtime image。Unit tests 是 CI 品質關卡，不是正式 container 需要執行的內容。
+
 ## 必要 Azure DevOps Service Connection
 
 Pipeline 目前預期 Azure DevOps 裡有這個 service connection：

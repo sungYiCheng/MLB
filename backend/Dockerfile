@@ -8,7 +8,7 @@ COPY src/MlbAi.Api/MlbAi.Api.csproj src/MlbAi.Api/
 COPY src/MlbAi.Application/MlbAi.Application.csproj src/MlbAi.Application/
 COPY src/MlbAi.Infrastructure/MlbAi.Infrastructure.csproj src/MlbAi.Infrastructure/
 
-RUN dotnet restore MlbAi.sln
+RUN dotnet restore src/MlbAi.Api/MlbAi.Api.csproj
 
 COPY . ./
 RUN dotnet publish src/MlbAi.Api/MlbAi.Api.csproj \
