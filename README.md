@@ -5,11 +5,17 @@ MLB AI Daily is a side-project workspace for a small full-stack web app:
 - Angular frontend
 - .NET Web API backend
 - Clean Architecture-style backend split into Api, Application, and Infrastructure
-- Future Azure deployment with low-cost hosting in mind
+- Azure deployment with low-cost hosting in mind
+
+## Learning Notes
+
+Practice notes, architecture diagrams, Azure deployment records, and current next steps are kept in:
+
+- [docs/learning-record.md](docs/learning-record.md)
 
 ## Current Status
 
-This workspace has been prepared as a fresh repo on this computer. The backend API and frontend MVP are ready.
+This workspace has been prepared as a full-stack MLB dashboard repo. The backend API, frontend dashboard, and first Azure deployment are ready.
 
 ```text
 backend/
