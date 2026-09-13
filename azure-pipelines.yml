@@ -116,10 +116,30 @@ stages:
           - script: |
               set -euo pipefail
 
-              echo "Checking $(containerAppUrl)/"
-              curl --retry 5 --retry-delay 10 --retry-all-errors --fail "$(containerAppUrl)/"
+              echo "Checking $(containerAppUrl)/health"
+              health_response="$(curl --retry 5 --retry-delay 10 --retry-all-errors --fail "$(containerAppUrl)/health")"
+              echo "$health_response"
+              echo "$health_response" | grep -q '"status":"healthy"'
+              echo "$health_response" | grep -q '"api-process"'
+              echo "$health_response" | grep -q '"mlb-stats-api-client"'
 
               echo
+              echo "Checking $(containerAppUrl)/"
+              curl --retry 5 --retry-delay 10 --retry-all-errors --fail "$(containerAppUrl)/"
+            displayName: Verify backend health
+
+  - stage: IntegrationCheck
+    displayName: Optional MLB API integration check
+    dependsOn: SmokeTest
+    condition: succeeded()
+    jobs:
+      - job: ProbeMlbData
+        displayName: Probe MLB data endpoint
+        steps:
+          - script: |
+              set -euo pipefail
+
               echo "Checking $(containerAppUrl)/api/games/today"
               curl --retry 5 --retry-delay 10 --retry-all-errors --fail "$(containerAppUrl)/api/games/today"
-            displayName: Verify backend responds
+            displayName: Verify MLB data endpoint responds
+            continueOnError: true

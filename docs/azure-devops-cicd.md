@@ -11,9 +11,11 @@
 ```text
 push 到 Azure DevOps main
   -> dotnet restore/build
+  -> dotnet test
   -> ACR cloud build backend image
   -> deploy image 到 Azure Container Apps
-  -> smoke test Azure backend endpoint
+  -> smoke test Azure backend health endpoint
+  -> optional MLB data integration check
 ```
 
 ## Pipeline 檔案
@@ -31,7 +33,8 @@ azure-pipelines.yml
 | `Validate` | 還原、編譯並執行 .NET backend unit tests |
 | `BuildImage` | 用 Azure Container Registry cloud build 建立 backend image |
 | `DeployBackend` | 將新 image 部署到 Azure Container Apps |
-| `SmokeTest` | 驗證 Azure backend `/` 與 `/api/games/today` 可以回應 |
+| `SmokeTest` | 驗證 Azure backend `/health` 與 `/` 可以回應 |
+| `IntegrationCheck` | 選擇性驗證 `/api/games/today` 能打到 MLB 資料 |
 
 目前 `DeployBackend` 先使用一般 job，不使用 Azure DevOps environment gate。等基本 CI/CD 跑順後，再加 environment approval 會比較適合練正式 release flow。
 
@@ -54,6 +57,46 @@ backend/tests/MlbAi.Application.Tests
 Pipeline 裡的 `Validate` stage 會先跑 `dotnet test`。如果 unit test 失敗，就不會繼續 build image 或 deploy。
 
 Docker image build 只 restore/publish `MlbAi.Api` 專案，不把 test project 放進 runtime image。Unit tests 是 CI 品質關卡，不是正式 container 需要執行的內容。
+
+## Health Check 與 Smoke Test
+
+目前後端提供：
+
+```text
+GET /health
+```
+
+`/health` 是部署後的穩定健康檢查，不會打外部 MLB API。它會回傳：
+
+- service name
+- overall status
+- ASP.NET Core environment
+- UTC timestamp
+- checks 清單
+
+目前 checks：
+
+| Check | 目的 |
+| --- | --- |
+| `api-process` | 確認 API process 活著，而且 HTTP pipeline 可以回應 |
+| `mlb-stats-api-client` | 確認 MLB Stats API client 有設定 base URL，但不真的呼叫外部服務 |
+
+Pipeline 的 `SmokeTest` stage 會檢查：
+
+```text
+GET /health
+GET /
+```
+
+其中 `/health` 還會用 `grep` 確認 response 裡有：
+
+```text
+"status":"healthy"
+"api-process"
+"mlb-stats-api-client"
+```
+
+原本的 `/api/games/today` 現在放到 `IntegrationCheck` stage，並設定為 optional。這樣 MLB 外部 API 如果暫時慢或失敗，不會把一次成功部署誤判成後端本身壞掉。
 
 ## 必要 Azure DevOps Service Connection
 

@@ -94,7 +94,8 @@ flowchart LR
     Push[Push 到 Azure DevOps main] --> Validate[Validate<br/>dotnet restore/build]
     Validate --> BuildImage[BuildImage<br/>ACR cloud build]
     BuildImage --> DeployBackend[DeployBackend<br/>更新 Container Apps image]
-    DeployBackend --> SmokeTest[SmokeTest<br/>檢查 / 與 /api/games/today]
+    DeployBackend --> SmokeTest[SmokeTest<br/>檢查 /health 與 /]
+    SmokeTest --> IntegrationCheck[IntegrationCheck<br/>選擇性檢查 /api/games/today]
 ```
 
 目前 pipeline 使用 Azure DevOps service connection 名稱：
@@ -159,6 +160,7 @@ sc-mlb-ai-go-azure
 主要 API endpoints：
 
 - `GET /`
+- `GET /health`
 - `GET /api/games/today`
 
 後端會先把 MLB 官方 API 的資料整理成前端比較好用的 JSON。Dashboard 目前包含比賽卡片、分區戰績、外卡排名、球員大頭照、打者/投手數據、各項數據領先者。

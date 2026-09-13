@@ -73,7 +73,7 @@ acrName: 'acrmlbaigo'
 imageRepository: 'mlb-ai-api'
 ```
 
-The backend CI/CD flow currently validates the .NET solution, runs backend unit tests, builds the backend image in ACR, deploys it to Azure Container Apps, and runs smoke tests against the deployed API.
+The backend CI/CD flow currently validates the .NET solution, runs backend unit tests, builds the backend image in ACR, deploys it to Azure Container Apps, runs smoke tests against `/health` and `/`, and then runs an optional integration check against `/api/games/today`.
 
 ## Frontend Commands
 
@@ -87,6 +87,7 @@ The Angular dev server runs at `http://127.0.0.1:53180` and proxies `/api` reque
 The API currently exposes:
 
 - `GET /`
+- `GET /health`
 - `GET /api/games/today`
 
 `/api/games/today` calls MLB's public Stats API schedule endpoint:
