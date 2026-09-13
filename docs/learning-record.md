@@ -93,8 +93,8 @@ flowchart TD
 flowchart LR
     Push[Push 到 Azure DevOps main] --> Validate[Validate<br/>dotnet restore/build]
     Validate --> BuildImage[BuildImage<br/>ACR cloud build]
-    BuildImage --> DeployBackend[DeployBackend<br/>更新 Container Apps image]
-    DeployBackend --> SmokeTest[SmokeTest<br/>檢查 /health 與 /]
+    BuildImage --> DeployBackend[DeployBackend<br/>更新 image 與 CORS env var]
+    DeployBackend --> SmokeTest[SmokeTest<br/>檢查 /health、/ 與 CORS]
     SmokeTest --> IntegrationCheck[IntegrationCheck<br/>選擇性檢查 /api/games/today]
 ```
 
@@ -226,6 +226,12 @@ azure  -> Azure DevOps
 
 ```text
 docs/azure-devops-cicd.md
+```
+
+設定管理與 CORS 筆記放在：
+
+```text
+docs/configuration-management.md
 ```
 
 ## 常用指令

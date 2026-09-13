@@ -12,6 +12,7 @@ MLB AI Daily is a side-project workspace for a small full-stack web app:
 Practice notes, architecture diagrams, Azure deployment records, and current next steps are kept in:
 
 - [docs/learning-record.md](docs/learning-record.md)
+- [docs/configuration-management.md](docs/configuration-management.md)
 
 ## Current Status
 
@@ -69,11 +70,12 @@ The pipeline uses these deployment variables in `azure-pipelines.yml`:
 azureServiceConnection: 'sc-mlb-ai-go-azure'
 resourceGroupName: 'rg-mlb-ai-go-dev'
 containerAppName: 'ca-mlb-ai-api'
+frontendDevUrl: 'https://yellow-forest-04081e300.5.azurestaticapps.net'
 acrName: 'acrmlbaigo'
 imageRepository: 'mlb-ai-api'
 ```
 
-The backend CI/CD flow currently validates the .NET solution, runs backend unit tests, builds the backend image in ACR, deploys it to Azure Container Apps, runs smoke tests against `/health` and `/`, and then runs an optional integration check against `/api/games/today`.
+The backend CI/CD flow currently validates the .NET solution, runs backend unit tests, builds the backend image in ACR, deploys it to Azure Container Apps, configures the allowed frontend origin, runs smoke tests against `/health`, `/`, and the CORS response header, and then runs an optional integration check against `/api/games/today`.
 
 ## Frontend Commands
 

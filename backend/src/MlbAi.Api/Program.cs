@@ -5,6 +5,9 @@ const string appName = "MLB AI Daily API";
 const string mlbStatsApiBaseUrl = "https://statsapi.mlb.com/api/v1/";
 
 var builder = WebApplication.CreateBuilder(args);
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
 
 builder.Services
     .AddHttpClient<IMlbService, MlbStatsService>(client =>
@@ -18,9 +21,17 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
     {
         policy
-            .AllowAnyOrigin()
             .AllowAnyHeader()
             .AllowAnyMethod();
+
+        if (allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins);
+        }
+        else
+        {
+            policy.SetIsOriginAllowed(_ => false);
+        }
     });
 });
 
@@ -41,7 +52,11 @@ app.MapGet("/health", (IHostEnvironment environment) =>
         new HealthCheckItem(
             Name: "mlb-stats-api-client",
             Status: "configured",
-            Description: "The MLB Stats API HTTP client has a base URL configured; this check does not call the external MLB API.")
+            Description: "The MLB Stats API HTTP client has a base URL configured; this check does not call the external MLB API."),
+        new HealthCheckItem(
+            Name: "cors-allowed-origins",
+            Status: allowedOrigins.Length > 0 ? "configured" : "not-configured",
+            Description: $"{allowedOrigins.Length} allowed origin(s) configured.")
     };
 
     return Results.Ok(new HealthResponse(

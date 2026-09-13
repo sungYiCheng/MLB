@@ -13,6 +13,7 @@ variables:
   resourceGroupName: 'rg-mlb-ai-go-dev'
   containerAppName: 'ca-mlb-ai-api'
   containerAppUrl: 'https://ca-mlb-ai-api.wonderfulpond-0bfd6efa.eastasia.azurecontainerapps.io'
+  frontendDevUrl: 'https://yellow-forest-04081e300.5.azurestaticapps.net'
   acrName: 'acrmlbaigo'
   imageRepository: 'mlb-ai-api'
   dockerfilePath: 'backend/Dockerfile'
@@ -97,7 +98,8 @@ stages:
                 az containerapp update \
                   --resource-group "$(resourceGroupName)" \
                   --name "$(containerAppName)" \
-                  --image "${image}"
+                  --image "${image}" \
+                  --set-env-vars "Cors__AllowedOrigins__0=$(frontendDevUrl)"
 
                 az containerapp revision list \
                   --resource-group "$(resourceGroupName)" \
@@ -122,10 +124,21 @@ stages:
               echo "$health_response" | grep -q '"status":"healthy"'
               echo "$health_response" | grep -q '"api-process"'
               echo "$health_response" | grep -q '"mlb-stats-api-client"'
+              echo "$health_response" | grep -q '"cors-allowed-origins"'
 
               echo
               echo "Checking $(containerAppUrl)/"
               curl --retry 5 --retry-delay 10 --retry-all-errors --fail "$(containerAppUrl)/"
+
+              echo
+              echo "Checking CORS allows $(frontendDevUrl)"
+              cors_headers="$(curl --retry 5 --retry-delay 10 --retry-all-errors --fail -sS -D - -o /dev/null \
+                --request OPTIONS \
+                --header "Origin: $(frontendDevUrl)" \
+                --header "Access-Control-Request-Method: GET" \
+                "$(containerAppUrl)/health")"
+              echo "$cors_headers"
+              echo "$cors_headers" | grep -i -q "access-control-allow-origin: $(frontendDevUrl)"
             displayName: Verify backend health
 
   - stage: IntegrationCheck
