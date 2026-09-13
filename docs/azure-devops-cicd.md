@@ -33,6 +33,8 @@ azure-pipelines.yml
 | `DeployBackend` | 將新 image 部署到 Azure Container Apps |
 | `SmokeTest` | 驗證 Azure backend `/` 與 `/api/games/today` 可以回應 |
 
+目前 `DeployBackend` 先使用一般 job，不使用 Azure DevOps environment gate。等基本 CI/CD 跑順後，再加 environment approval 會比較適合練正式 release flow。
+
 ## 必要 Azure DevOps Service Connection
 
 Pipeline 目前預期 Azure DevOps 裡有這個 service connection：

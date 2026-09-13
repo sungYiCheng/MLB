@@ -68,35 +68,31 @@ stages:
     dependsOn: BuildImage
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
-      - deployment: DeployContainerApp
+      - job: DeployContainerApp
         displayName: Update backend container app
-        environment: mlb-ai-go-dev
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - task: AzureCLI@2
-                  displayName: Deploy image to Container Apps
-                  inputs:
-                    azureSubscription: '$(azureServiceConnection)'
-                    scriptType: bash
-                    scriptLocation: inlineScript
-                    inlineScript: |
-                      set -euo pipefail
+        steps:
+          - task: AzureCLI@2
+            displayName: Deploy image to Container Apps
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
 
-                      image="$(acrName).azurecr.io/$(imageRepository):$(imageTag)"
-                      echo "Deploying ${image} to $(containerAppName)"
+                image="$(acrName).azurecr.io/$(imageRepository):$(imageTag)"
+                echo "Deploying ${image} to $(containerAppName)"
 
-                      az containerapp update \
-                        --resource-group "$(resourceGroupName)" \
-                        --name "$(containerAppName)" \
-                        --image "${image}"
+                az containerapp update \
+                  --resource-group "$(resourceGroupName)" \
+                  --name "$(containerAppName)" \
+                  --image "${image}"
 
-                      az containerapp revision list \
-                        --resource-group "$(resourceGroupName)" \
-                        --name "$(containerAppName)" \
-                        --query "[?properties.active].{revision:name,image:properties.template.containers[0].image,traffic:properties.trafficWeight}" \
-                        --output table
+                az containerapp revision list \
+                  --resource-group "$(resourceGroupName)" \
+                  --name "$(containerAppName)" \
+                  --query "[?properties.active].{revision:name,image:properties.template.containers[0].image,traffic:properties.trafficWeight}" \
+                  --output table
 
   - stage: SmokeTest
     displayName: Smoke test deployed API
