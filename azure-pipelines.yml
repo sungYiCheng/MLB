@@ -27,7 +27,7 @@ stages:
     displayName: Validate backend
     jobs:
       - job: DotNetBuild
-        displayName: Restore and build
+        displayName: Restore, build, and test
         steps:
           - task: UseDotNet@2
             displayName: Install .NET SDK
@@ -40,6 +40,17 @@ stages:
 
           - script: dotnet build backend/MlbAi.sln --configuration Release --no-restore
             displayName: Build backend
+
+          - script: dotnet test backend/MlbAi.sln --configuration Release --no-build --logger trx --results-directory "$(Agent.TempDirectory)/test-results"
+            displayName: Run backend unit tests
+
+          - task: PublishTestResults@2
+            displayName: Publish test results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: VSTest
+              testResultsFiles: "$(Agent.TempDirectory)/test-results/*.trx"
+              failTaskOnFailedTests: true
 
   - stage: BuildImage
     displayName: Build API image in ACR

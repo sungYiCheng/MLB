@@ -32,6 +32,7 @@ frontend/
 
 ```powershell
 dotnet build backend\MlbAi.sln
+dotnet test backend\MlbAi.sln
 dotnet run --project backend\src\MlbAi.Api\MlbAi.Api.csproj
 ```
 
@@ -72,7 +73,7 @@ acrName: 'acrmlbaigo'
 imageRepository: 'mlb-ai-api'
 ```
 
-The backend CI/CD flow currently validates the .NET solution, builds the backend image in ACR, deploys it to Azure Container Apps, and runs smoke tests against the deployed API.
+The backend CI/CD flow currently validates the .NET solution, runs backend unit tests, builds the backend image in ACR, deploys it to Azure Container Apps, and runs smoke tests against the deployed API.
 
 ## Frontend Commands
 

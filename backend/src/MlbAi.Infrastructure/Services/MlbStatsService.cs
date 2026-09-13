@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http.Json;
 using MlbAi.Application.Interfaces;
 using MlbAi.Application.Models;
+using MlbAi.Application.Services;
 
 namespace MlbAi.Infrastructure.Services;
 
@@ -199,13 +200,13 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
             HomeWinner: game.Teams?.Home?.IsWinner,
             VenueId: game.Venue?.Id,
             VenueName: game.Venue?.Name,
-            GameType: FormatGameType(game.GameType),
-            DayNight: FormatTitleCase(game.DayNight),
+            GameType: MlbDisplayFormatter.FormatGameType(game.GameType),
+            DayNight: MlbDisplayFormatter.FormatTitleCase(game.DayNight),
             ScheduledInnings: game.ScheduledInnings ?? game.Linescore?.ScheduledInnings,
             GamesInSeries: game.GamesInSeries,
             SeriesGameNumber: game.SeriesGameNumber,
             SeriesDescription: game.SeriesDescription,
-            DoubleHeader: FormatDoubleHeader(game.DoubleHeader),
+            DoubleHeader: MlbDisplayFormatter.FormatDoubleHeader(game.DoubleHeader),
             CurrentInning: game.Linescore?.CurrentInning,
             CurrentInningOrdinal: game.Linescore?.CurrentInningOrdinal,
             InningHalf: game.Linescore?.InningHalf ?? game.Linescore?.InningState,
@@ -222,39 +223,7 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
     {
         return record is null
             ? null
-            : $"{record.Wins}-{record.Losses}";
-    }
-
-    private static string? FormatGameType(string? gameType)
-    {
-        return gameType switch
-        {
-            "R" => "Regular Season",
-            "S" => "Spring Training",
-            "F" => "Wild Card",
-            "D" => "Division Series",
-            "L" => "League Championship",
-            "W" => "World Series",
-            _ => gameType
-        };
-    }
-
-    private static string? FormatDoubleHeader(string? doubleHeader)
-    {
-        return doubleHeader switch
-        {
-            "N" => "No",
-            "Y" => "Yes",
-            "S" => "Split",
-            _ => doubleHeader
-        };
-    }
-
-    private static string? FormatTitleCase(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value)
-            ? null
-            : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.ToLowerInvariant());
+            : MlbDisplayFormatter.FormatRecord(record.Wins, record.Losses);
     }
 
     private static IReadOnlyList<MlbPitcherLineDto> BuildPitcherLines(MlbBoxScoreTeam? boxScoreTeam)
@@ -445,7 +414,7 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
 
         if (awayPitchers.Count > 0 || homePitchers.Count > 0)
         {
-            highlights.Add($"{game.AwayTeam} used {awayPitchers.Count} pitcher{Pluralize(awayPitchers.Count)}; {game.HomeTeam} used {homePitchers.Count} pitcher{Pluralize(homePitchers.Count)}.");
+            highlights.Add($"{game.AwayTeam} used {awayPitchers.Count} pitcher{MlbDisplayFormatter.Pluralize(awayPitchers.Count)}; {game.HomeTeam} used {homePitchers.Count} pitcher{MlbDisplayFormatter.Pluralize(homePitchers.Count)}.");
         }
 
         return highlights;
@@ -509,11 +478,6 @@ public sealed class MlbStatsService(HttpClient httpClient) : IMlbService
         return lastTen is null
             ? null
             : $"{lastTen.Wins}-{lastTen.Losses}";
-    }
-
-    private static string Pluralize(int count)
-    {
-        return count == 1 ? string.Empty : "s";
     }
 
     private static DateOnly? ParseDateOnly(string? value)

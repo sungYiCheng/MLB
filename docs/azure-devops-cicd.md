@@ -28,12 +28,30 @@ azure-pipelines.yml
 
 | Stage | 目的 |
 | --- | --- |
-| `Validate` | 還原並編譯 .NET backend |
+| `Validate` | 還原、編譯並執行 .NET backend unit tests |
 | `BuildImage` | 用 Azure Container Registry cloud build 建立 backend image |
 | `DeployBackend` | 將新 image 部署到 Azure Container Apps |
 | `SmokeTest` | 驗證 Azure backend `/` 與 `/api/games/today` 可以回應 |
 
 目前 `DeployBackend` 先使用一般 job，不使用 Azure DevOps environment gate。等基本 CI/CD 跑順後，再加 environment approval 會比較適合練正式 release flow。
+
+## Unit Test 位置
+
+目前第一個測試專案：
+
+```text
+backend/tests/MlbAi.Application.Tests
+```
+
+這批測試先針對不依賴外部 MLB API 的純邏輯：
+
+- 戰績格式化
+- MLB game type code 轉顯示文字
+- double-header code 轉顯示文字
+- title case 顯示格式
+- 英文單複數 suffix
+
+Pipeline 裡的 `Validate` stage 會先跑 `dotnet test`。如果 unit test 失敗，就不會繼續 build image 或 deploy。
 
 ## 必要 Azure DevOps Service Connection
 
