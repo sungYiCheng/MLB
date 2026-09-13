@@ -9,12 +9,15 @@ pr:
       - main
 
 variables:
-  azureServiceConnection: 'TODO-AZURE-SERVICE-CONNECTION'
+  azureServiceConnection: 'sc-mlb-ai-go-azure'
+  resourceGroupName: 'rg-mlb-ai-go-dev'
+  containerAppName: 'ca-mlb-ai-api'
+  containerAppUrl: 'https://ca-mlb-ai-api.wonderfulpond-0bfd6efa.eastasia.azurecontainerapps.io'
   acrName: 'acrmlbaigo'
   imageRepository: 'mlb-ai-api'
   dockerfilePath: 'backend/Dockerfile'
   buildContext: 'backend'
-  imageTag: '$(Build.BuildId)'
+  imageTag: '$(Build.SourceVersion)'
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -59,3 +62,57 @@ stages:
                   --image "$(imageRepository):latest" \
                   --file "$(dockerfilePath)" \
                   "$(buildContext)"
+
+  - stage: DeployBackend
+    displayName: Deploy API to Container Apps
+    dependsOn: BuildImage
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployContainerApp
+        displayName: Update backend container app
+        environment: mlb-ai-go-dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  displayName: Deploy image to Container Apps
+                  inputs:
+                    azureSubscription: '$(azureServiceConnection)'
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+
+                      image="$(acrName).azurecr.io/$(imageRepository):$(imageTag)"
+                      echo "Deploying ${image} to $(containerAppName)"
+
+                      az containerapp update \
+                        --resource-group "$(resourceGroupName)" \
+                        --name "$(containerAppName)" \
+                        --image "${image}"
+
+                      az containerapp revision list \
+                        --resource-group "$(resourceGroupName)" \
+                        --name "$(containerAppName)" \
+                        --query "[?properties.active].{revision:name,image:properties.template.containers[0].image,traffic:properties.trafficWeight}" \
+                        --output table
+
+  - stage: SmokeTest
+    displayName: Smoke test deployed API
+    dependsOn: DeployBackend
+    condition: succeeded()
+    jobs:
+      - job: ProbeBackend
+        displayName: Probe backend endpoints
+        steps:
+          - script: |
+              set -euo pipefail
+
+              echo "Checking $(containerAppUrl)/"
+              curl --retry 5 --retry-delay 10 --retry-all-errors --fail "$(containerAppUrl)/"
+
+              echo
+              echo "Checking $(containerAppUrl)/api/games/today"
+              curl --retry 5 --retry-delay 10 --retry-all-errors --fail "$(containerAppUrl)/api/games/today"
+            displayName: Verify backend responds

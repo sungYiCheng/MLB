@@ -60,13 +60,19 @@ The current Azure development frontend is:
 https://yellow-forest-04081e300.5.azurestaticapps.net
 ```
 
-Before running the pipeline, update these variables in `azure-pipelines.yml`:
+Before running the pipeline, create an Azure DevOps Azure Resource Manager service connection named `sc-mlb-ai-go-azure`.
+
+The pipeline uses these deployment variables in `azure-pipelines.yml`:
 
 ```yaml
-azureServiceConnection: 'TODO-AZURE-SERVICE-CONNECTION'
+azureServiceConnection: 'sc-mlb-ai-go-azure'
+resourceGroupName: 'rg-mlb-ai-go-dev'
+containerAppName: 'ca-mlb-ai-api'
 acrName: 'acrmlbaigo'
 imageRepository: 'mlb-ai-api'
 ```
+
+The backend CI/CD flow currently validates the .NET solution, builds the backend image in ACR, deploys it to Azure Container Apps, and runs smoke tests against the deployed API.
 
 ## Frontend Commands
 
@@ -93,7 +99,7 @@ The response includes game id, official game date, UTC game time, teams, status,
 ## Next Steps
 
 1. Create an Azure DevOps Azure Resource Manager service connection.
-2. Replace the `azureServiceConnection` placeholder in `azure-pipelines.yml`.
-3. Wire the Angular production API URL to the Azure Container Apps backend.
-4. Deploy the frontend to Azure Static Web Apps.
+2. Push `azure-pipelines.yml` to Azure DevOps and run the backend pipeline.
+3. Add frontend deployment to Azure Static Web Apps from Azure DevOps.
+4. Add automated tests and stricter deployment gates.
 5. Move the same image flow to AKS when ready.

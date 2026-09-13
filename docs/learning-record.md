@@ -87,6 +87,24 @@ flowchart TD
     FrontendBuild --> StaticWebApp[Azure Static Web Apps 前端]
 ```
 
+## 目前 Azure DevOps Pipeline 流程
+
+```mermaid
+flowchart LR
+    Push[Push 到 Azure DevOps main] --> Validate[Validate<br/>dotnet restore/build]
+    Validate --> BuildImage[BuildImage<br/>ACR cloud build]
+    BuildImage --> DeployBackend[DeployBackend<br/>更新 Container Apps image]
+    DeployBackend --> SmokeTest[SmokeTest<br/>檢查 / 與 /api/games/today]
+```
+
+目前 pipeline 使用 Azure DevOps service connection 名稱：
+
+```text
+sc-mlb-ai-go-azure
+```
+
+這個 service connection 需要在 Azure DevOps 專案中建立，並授權它能操作目前的 Azure resource group 與 Container Apps。
+
 ## 重要本機 Port
 
 | Service | URL |
@@ -196,11 +214,17 @@ azure  -> Azure DevOps
 
 ## 目前下一步
 
-1. 建立或完成 Azure DevOps service connection。
-2. 將 `azure-pipelines.yml` 裡的 `TODO-AZURE-SERVICE-CONNECTION` 換成實際 service connection 名稱。
-3. 從 Azure DevOps 執行 pipeline。
+1. 將這次 pipeline 變更 push 到 Azure DevOps。
+2. 從 Azure DevOps 建立或執行 pipeline，確認後端可以自動部署到 Container Apps。
+3. 檢查 pipeline smoke test 結果。
 4. 每次練習完，到 Azure Cost Management 看一下成本。
 5. 之後再加入 AKS 練習，例如 start/stop 或用 IaC 每次重建。
+
+更細的 Azure DevOps CI/CD 操作筆記放在：
+
+```text
+docs/azure-devops-cicd.md
+```
 
 ## 常用指令
 

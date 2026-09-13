@@ -5,3 +5,4 @@
 ## 筆記
 
 - [練習紀錄](./learning-record.md)：目前完整的練習過程，包含本機設定、Git 流程、Azure 部署、成本筆記和架構圖。
+- [Azure DevOps CI/CD 筆記](./azure-devops-cicd.md)：目前後端 pipeline、service connection、部署驗證與未來 AKS 對應觀念。
