@@ -85,7 +85,7 @@ imageRepository: 'mlb-ai-api'
 
 The backend CI/CD flow currently validates the .NET solution, runs backend unit tests, builds the backend image in ACR, deploys it to Azure Container Apps, configures the allowed frontend origin, runs smoke tests against `/health`, `/`, and the CORS response header, and then runs an optional integration check against `/api/games/today`.
 
-The frontend CI/CD flow installs Angular dependencies, builds the production frontend, deploys the built files to Azure Static Web Apps, and smoke-tests the public frontend URL. The frontend pipeline needs a secret variable named `AZURE_STATIC_WEB_APPS_API_TOKEN`.
+The frontend CI/CD flow installs Angular dependencies, runs Vitest unit tests, publishes JUnit test results, builds the production frontend, deploys the built files to Azure Static Web Apps, and smoke-tests the public frontend URL. The frontend pipeline needs a secret variable named `AZURE_STATIC_WEB_APPS_API_TOKEN`.
 
 ## Frontend Commands
 
@@ -93,6 +93,16 @@ The frontend CI/CD flow installs Angular dependencies, builds the production fro
 cd frontend
 npm start
 ```
+
+Frontend tests:
+
+```powershell
+cd frontend
+npm test
+npm run test:ci
+```
+
+`npm run test:ci` writes a JUnit report to `frontend/test-results/junit.xml` for Azure DevOps.
 
 The Angular dev server runs at `http://127.0.0.1:53180` and proxies `/api` requests to `http://localhost:5106`.
 

@@ -73,7 +73,7 @@ azure-pipelines-frontend.yml
 
 | Stage | 目的 |
 | --- | --- |
-| `ValidateFrontend` | 安裝 Node.js、執行 `npm ci`、build Angular production bundle，並發布 build artifact |
+| `ValidateFrontend` | 安裝 Node.js、執行 `npm ci`、跑 Vitest unit tests、發布測試結果、build Angular production bundle，並發布 build artifact |
 | `DeployFrontend` | 使用 Azure Static Web Apps deployment token 將前端靜態檔部署到 Azure |
 | `FrontendSmokeTest` | 驗證公開前端網址可以回應，且 HTML 裡有 Angular root element |
 
@@ -92,9 +92,36 @@ AZURE_STATIC_WEB_APPS_API_TOKEN
 
 這個 token 是 Azure Static Web Apps 的 deployment token。它是敏感資料，所以不放進 repo，也不寫進 YAML。
 
+前端目前使用 Vitest 做 unit tests：
+
+```text
+frontend/src/app/mlb-display.spec.ts
+```
+
+這批測試先針對前端畫面格式化邏輯：
+
+- 比賽狀態是否為 live
+- 台灣時間顯示
+- 比分、戰績、落後場次 fallback
+- 局數、好壞球、出局數格式
+- 打者與投手數據文字
+- 球隊 logo 與球員大頭照 URL
+
+Pipeline 會跑：
+
+```text
+npm run test:ci
+```
+
+並把這個 JUnit 測試報表發布到 Azure DevOps：
+
+```text
+frontend/test-results/junit.xml
+```
+
 ## Unit Test 位置
 
-目前第一個測試專案：
+目前後端第一個測試專案：
 
 ```text
 backend/tests/MlbAi.Application.Tests

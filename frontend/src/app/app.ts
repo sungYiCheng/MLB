@@ -2,6 +2,25 @@ import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { environment } from '../environments/environment';
+import {
+  batterSeasonLine,
+  battingLine,
+  countText,
+  detailText,
+  formatTaipeiTime,
+  gamesBackText,
+  hasList,
+  inningText,
+  isLiveStatus,
+  pitcherCountText,
+  pitcherSeasonLine,
+  pitcherText,
+  playerHeadshotUrl,
+  recordText,
+  scoreText,
+  seriesText,
+  teamLogoUrl
+} from './mlb-display';
 
 @Component({
   selector: 'app-root',
@@ -56,8 +75,7 @@ export class App implements OnInit {
   }
 
   protected isLive(status: string): boolean {
-    const normalizedStatus = status.toLowerCase();
-    return normalizedStatus.includes('progress') || normalizedStatus.includes('warmup');
+    return isLiveStatus(status);
   }
 
   private apiUrl(path: string): string {
@@ -101,115 +119,67 @@ export class App implements OnInit {
   }
 
   protected formatTaipeiTime(value: string | null): string {
-    if (!value) {
-      return 'Time TBD';
-    }
-
-    return new Intl.DateTimeFormat('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZone: 'Asia/Taipei',
-      timeZoneName: 'short'
-    }).format(new Date(value));
+    return formatTaipeiTime(value);
   }
 
   protected scoreText(score: number | null): string {
-    return score === null ? '-' : score.toString();
+    return scoreText(score);
   }
 
   protected detailText(value: string | number | null | undefined): string {
-    return value === null || value === undefined || value === '' ? '-' : value.toString();
+    return detailText(value);
   }
 
   protected seriesText(game: MlbGame): string {
-    if (game.seriesGameNumber && game.gamesInSeries) {
-      return `Game ${game.seriesGameNumber} of ${game.gamesInSeries}`;
-    }
-
-    return '-';
+    return seriesText(game);
   }
 
   protected inningText(game: MlbGame): string {
-    if (!game.currentInningOrdinal) {
-      return game.scheduledInnings ? `${game.scheduledInnings} innings` : '-';
-    }
-
-    return game.inningHalf ? `${game.inningHalf} ${game.currentInningOrdinal}` : game.currentInningOrdinal;
+    return inningText(game);
   }
 
   protected countText(game: MlbGame): string {
-    if (game.balls === null || game.strikes === null || game.outs === null) {
-      return '-';
-    }
-
-    return `${game.balls}-${game.strikes}, ${game.outs} out${game.outs === 1 ? '' : 's'}`;
+    return countText(game);
   }
 
   protected pitcherText(value: string | null): string {
-    return value ?? 'TBD';
+    return pitcherText(value);
   }
 
   protected hasList(value: readonly unknown[] | null | undefined): boolean {
-    return Boolean(value?.length);
+    return hasList(value);
   }
 
   protected pitcherCountText(pitchers: MlbPitcherLine[] | null | undefined): string {
-    const pitcherCount = pitchers?.length ?? 0;
-    return `${pitcherCount} pitcher${pitcherCount === 1 ? '' : 's'} used`;
+    return pitcherCountText(pitchers);
   }
 
   protected battingLine(batter: MlbBatterLine): string {
-    return [
-      `${this.detailText(batter.hits)}-${this.detailText(batter.atBats)}`,
-      `${this.detailText(batter.rbi)} RBI`,
-      `${this.detailText(batter.runs)} R`,
-      `${this.detailText(batter.homeRuns)} HR`,
-      `${this.detailText(batter.walks)} BB`,
-      `${this.detailText(batter.strikeOuts)} K`
-    ].join(' · ');
+    return battingLine(batter);
   }
 
   protected batterSeasonLine(batter: MlbBatterLine): string {
-    return [
-      `AVG ${this.detailText(batter.seasonAverage)}`,
-      `OBP ${this.detailText(batter.seasonOnBasePercentage)}`,
-      `SLG ${this.detailText(batter.seasonSluggingPercentage)}`,
-      `OPS ${this.detailText(batter.seasonOps)}`,
-      `${this.detailText(batter.seasonHomeRuns)} HR`,
-      `${this.detailText(batter.seasonRbi)} RBI`,
-      `${this.detailText(batter.seasonStolenBases)} SB`
-    ].join(' · ');
+    return batterSeasonLine(batter);
   }
 
   protected pitcherSeasonLine(pitcher: MlbPitcherLine): string {
-    return [
-      `${this.detailText(pitcher.seasonWins)}-${this.detailText(pitcher.seasonLosses)}`,
-      `ERA ${this.detailText(pitcher.seasonEra)}`,
-      `WHIP ${this.detailText(pitcher.seasonWhip)}`,
-      `${this.detailText(pitcher.seasonStrikeOuts)} K`,
-      `${this.detailText(pitcher.seasonInningsPitched)} IP`,
-      `${this.detailText(pitcher.seasonSaves)} SV`
-    ].join(' · ');
+    return pitcherSeasonLine(pitcher);
   }
 
   protected recordText(team: MlbTeamStanding): string {
-    return `${team.wins}-${team.losses}`;
+    return recordText(team);
   }
 
   protected gamesBackText(value: string | null): string {
-    return value === null || value === '' ? '-' : value;
+    return gamesBackText(value);
   }
 
   protected teamLogoUrl(teamId: number | null): string {
-    return teamId
-      ? `https://www.mlbstatic.com/team-logos/${teamId}.svg`
-      : 'https://www.mlbstatic.com/team-logos/league-on-dark/1.svg';
+    return teamLogoUrl(teamId);
   }
 
   protected playerHeadshotUrl(playerId: number | null): string {
-    return playerId
-      ? `https://img.mlbstatic.com/mlb-photos/image/upload/w_96,q_auto:best/v1/people/${playerId}/headshot/67/current`
-      : 'https://www.mlbstatic.com/team-logos/league-on-dark/1.svg';
+    return playerHeadshotUrl(playerId);
   }
 
   protected hideBrokenImage(event: Event): void {

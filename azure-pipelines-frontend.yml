@@ -40,6 +40,18 @@ stages:
             displayName: Install frontend dependencies
             workingDirectory: '$(appDirectory)'
 
+          - script: npm run test:ci
+            displayName: Run frontend unit tests
+            workingDirectory: '$(appDirectory)'
+
+          - task: PublishTestResults@2
+            displayName: Publish frontend test results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: '$(appDirectory)/test-results/junit.xml'
+              failTaskOnFailedTests: true
+
           - script: npm run build
             displayName: Build frontend
             workingDirectory: '$(appDirectory)'

@@ -198,6 +198,23 @@ Production build 會使用這個檔案中的 Azure 後端 URL：
 frontend/src/environments/environment.production.ts
 ```
 
+前端目前已加入 Vitest unit tests：
+
+```text
+frontend/src/app/mlb-display.ts
+frontend/src/app/mlb-display.spec.ts
+```
+
+`mlb-display.ts` 放前端畫面顯示用的純邏輯，例如比賽狀態、比分、打者/投手 stat line、球隊 logo 與球員大頭照 URL。這些邏輯不需要啟動瀏覽器或 Angular component 就能測，因此很適合放進 CI/CD 的第一層檢查。
+
+常用測試指令：
+
+```powershell
+cd frontend
+npm test
+npm run test:ci
+```
+
 ## Git 與 Remote 筆記
 
 目前 remotes：
