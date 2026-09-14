@@ -31,10 +31,10 @@ stages:
       - job: AngularBuild
         displayName: Install dependencies and build Angular
         steps:
-          - task: NodeTool@0
+          - task: UseNode@1
             displayName: Install Node.js
             inputs:
-              versionSpec: '24.x'
+              version: '24.x'
 
           - script: npm ci
             displayName: Install frontend dependencies
