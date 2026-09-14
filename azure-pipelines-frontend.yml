@@ -1,0 +1,91 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - frontend/**
+      - azure-pipelines-frontend.yml
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - frontend/**
+      - azure-pipelines-frontend.yml
+
+variables:
+  staticWebAppUrl: 'https://yellow-forest-04081e300.5.azurestaticapps.net'
+  appDirectory: 'frontend'
+  buildOutputDirectory: 'frontend/dist/frontend/browser'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: ValidateFrontend
+    displayName: Validate frontend
+    jobs:
+      - job: AngularBuild
+        displayName: Install dependencies and build Angular
+        steps:
+          - task: NodeTool@0
+            displayName: Install Node.js
+            inputs:
+              versionSpec: '24.x'
+
+          - script: npm ci
+            displayName: Install frontend dependencies
+            workingDirectory: '$(appDirectory)'
+
+          - script: npm run build
+            displayName: Build frontend
+            workingDirectory: '$(appDirectory)'
+
+          - script: |
+              set -euo pipefail
+              test -f "$(buildOutputDirectory)/index.html"
+              grep -q '<app-root' "$(buildOutputDirectory)/index.html"
+            displayName: Verify frontend build output
+
+          - publish: '$(buildOutputDirectory)'
+            artifact: frontend-dist
+            displayName: Publish frontend artifact
+
+  - stage: DeployFrontend
+    displayName: Deploy frontend to Static Web Apps
+    dependsOn: ValidateFrontend
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: StaticWebAppDeploy
+        displayName: Deploy Angular static files
+        steps:
+          - download: current
+            artifact: frontend-dist
+            displayName: Download frontend artifact
+
+          - task: AzureStaticWebApp@0
+            displayName: Deploy to Azure Static Web Apps
+            inputs:
+              app_location: '$(Pipeline.Workspace)/frontend-dist'
+              output_location: ''
+              skip_app_build: true
+              skip_api_build: true
+              azure_static_web_apps_api_token: '$(AZURE_STATIC_WEB_APPS_API_TOKEN)'
+
+  - stage: FrontendSmokeTest
+    displayName: Smoke test frontend
+    dependsOn: DeployFrontend
+    condition: succeeded()
+    jobs:
+      - job: ProbeFrontend
+        displayName: Probe Static Web Apps site
+        steps:
+          - script: |
+              set -euo pipefail
+              echo "Checking $(staticWebAppUrl)"
+              html="$(curl --retry 5 --retry-delay 10 --retry-all-errors --fail "$(staticWebAppUrl)")"
+              echo "$html" | grep -q '<app-root'
+            displayName: Verify frontend responds

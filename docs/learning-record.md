@@ -1,6 +1,6 @@
 # MLB AI Daily 練習紀錄
 
-最後更新：2026-09-13
+最後更新：2026-09-14
 
 ## 目標
 
@@ -31,6 +31,8 @@
 |   +-- package.json
 |   +-- src/
 +-- azure-pipelines.yml
++-- azure-pipelines-backend.yml
++-- azure-pipelines-frontend.yml
 +-- docs/
 +-- PROJECT_CONTEXT.md
 +-- README.md
@@ -79,23 +81,35 @@ flowchart TD
     Code[本機程式碼] --> Commit[Git Commit]
     Commit --> GitHub[Push 到 GitHub]
     Commit --> AzureRepo[Push 到 Azure DevOps Repo]
-    AzureRepo --> Pipeline[Azure Pipeline]
-    Pipeline --> Build[ACR Task 雲端 Build]
+    AzureRepo --> BackendPipeline[Backend Pipeline]
+    AzureRepo --> FrontendPipeline[Frontend Pipeline]
+    BackendPipeline --> Build[ACR Task 雲端 Build]
     Build --> Image[acrmlbaigo.azurecr.io/mlb-ai-api]
     Image --> ContainerApp[Azure Container Apps 後端]
-    Code --> FrontendBuild[Angular production build]
+    FrontendPipeline --> FrontendBuild[Angular production build]
     FrontendBuild --> StaticWebApp[Azure Static Web Apps 前端]
 ```
 
 ## 目前 Azure DevOps Pipeline 流程
 
 ```mermaid
-flowchart LR
+flowchart TD
     Push[Push 到 Azure DevOps main] --> Validate[Validate<br/>dotnet restore/build]
     Validate --> BuildImage[BuildImage<br/>ACR cloud build]
     BuildImage --> DeployBackend[DeployBackend<br/>更新 image 與 CORS env var]
     DeployBackend --> SmokeTest[SmokeTest<br/>檢查 /health、/ 與 CORS]
     SmokeTest --> IntegrationCheck[IntegrationCheck<br/>選擇性檢查 /api/games/today]
+    Push --> FrontendValidate[ValidateFrontend<br/>npm ci/build]
+    FrontendValidate --> FrontendDeploy[DeployFrontend<br/>Static Web Apps]
+    FrontendDeploy --> FrontendSmoke[FrontendSmokeTest<br/>檢查前端網址]
+```
+
+目前 Azure DevOps YAML 已拆開：
+
+```text
+azure-pipelines.yml           # 停用的總入口
+azure-pipelines-backend.yml   # 後端 pipeline
+azure-pipelines-frontend.yml  # 前端 pipeline
 ```
 
 目前 pipeline 使用 Azure DevOps service connection 名稱：
@@ -217,10 +231,11 @@ azure  -> Azure DevOps
 ## 目前下一步
 
 1. 將這次 pipeline 變更 push 到 Azure DevOps。
-2. 從 Azure DevOps 建立或執行 pipeline，確認後端可以自動部署到 Container Apps。
-3. 檢查 pipeline smoke test 結果。
-4. 每次練習完，到 Azure Cost Management 看一下成本。
-5. 之後再加入 AKS 練習，例如 start/stop 或用 IaC 每次重建。
+2. 確認 backend pipeline 可以自動部署到 Container Apps。
+3. 確認 frontend pipeline 可以自動部署到 Static Web Apps。
+4. 檢查 backend/frontend smoke test 結果。
+5. 每次練習完，到 Azure Cost Management 看一下成本。
+6. 之後再加入 AKS 練習，例如 start/stop 或用 IaC 每次重建。
 
 更細的 Azure DevOps CI/CD 操作筆記放在：
 

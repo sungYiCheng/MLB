@@ -4,27 +4,42 @@
 
 ## 目前目標
 
-先完成後端 CI/CD，不急著進 AKS。
+先完成前後端分離 CI/CD，不急著進 AKS。
 
 目前 pipeline 要做到：
 
 ```text
 push 到 Azure DevOps main
-  -> dotnet restore/build
-  -> dotnet test
-  -> ACR cloud build backend image
-  -> deploy image 到 Azure Container Apps
-  -> set Container Apps CORS environment variable
-  -> smoke test Azure backend health endpoint
-  -> optional MLB data integration check
+  -> backend pipeline 驗證 .NET、build image、deploy Container Apps
+  -> frontend pipeline 驗證 Angular、deploy Static Web Apps
+  -> smoke test public frontend/backend endpoints
 ```
 
 ## Pipeline 檔案
 
-主要檔案：
+主要檔案已拆成三支：
 
 ```text
-azure-pipelines.yml
+azure-pipelines.yml           # 停用的總入口，只保留說明
+azure-pipelines-backend.yml   # 後端 CI/CD
+azure-pipelines-frontend.yml  # 前端 CI/CD
+```
+
+`azure-pipelines.yml` 設定：
+
+```yaml
+trigger: none
+pr: none
+```
+
+這樣可以避免 Azure DevOps 預設抓根目錄 YAML 時，不小心把前後端一起部署。真正會跑的是另外兩支 pipeline YAML。
+
+## Backend Pipeline
+
+後端 pipeline 檔案：
+
+```text
+azure-pipelines-backend.yml
 ```
 
 目前 stages：
@@ -38,6 +53,44 @@ azure-pipelines.yml
 | `IntegrationCheck` | 選擇性驗證 `/api/games/today` 能打到 MLB 資料 |
 
 目前 `DeployBackend` 先使用一般 job，不使用 Azure DevOps environment gate。等基本 CI/CD 跑順後，再加 environment approval 會比較適合練正式 release flow。
+
+後端 pipeline 只有在這些路徑變更時自動觸發：
+
+```text
+backend/**
+azure-pipelines-backend.yml
+```
+
+## Frontend Pipeline
+
+前端 pipeline 檔案：
+
+```text
+azure-pipelines-frontend.yml
+```
+
+目前 stages：
+
+| Stage | 目的 |
+| --- | --- |
+| `ValidateFrontend` | 安裝 Node.js、執行 `npm ci`、build Angular production bundle，並發布 build artifact |
+| `DeployFrontend` | 使用 Azure Static Web Apps deployment token 將前端靜態檔部署到 Azure |
+| `FrontendSmokeTest` | 驗證公開前端網址可以回應，且 HTML 裡有 Angular root element |
+
+前端 pipeline 只有在這些路徑變更時自動觸發：
+
+```text
+frontend/**
+azure-pipelines-frontend.yml
+```
+
+前端 pipeline 需要 Azure DevOps secret variable：
+
+```text
+AZURE_STATIC_WEB_APPS_API_TOKEN
+```
+
+這個 token 是 Azure Static Web Apps 的 deployment token。它是敏感資料，所以不放進 repo，也不寫進 YAML。
 
 ## Unit Test 位置
 
@@ -144,11 +197,12 @@ Project settings
 
 ## 第一次執行 Pipeline 前檢查
 
-1. `azure-pipelines.yml` 已經 push 到 Azure DevOps repo。
-2. Azure DevOps repo 有建立 pipeline，來源指到 `azure-pipelines.yml`。
+1. `azure-pipelines-backend.yml` 和 `azure-pipelines-frontend.yml` 已經 push 到 Azure DevOps repo。
+2. Azure DevOps repo 有建立兩條 pipeline，分別指到 backend/frontend YAML。
 3. Service connection 名稱是 `sc-mlb-ai-go-azure`。
 4. Service connection 有權限操作 `rg-mlb-ai-go-dev`。
-5. Pipeline 第一次跑時，如果 Azure DevOps 要求授權使用 service connection，要按 approve。
+5. Frontend pipeline 有設定 secret variable `AZURE_STATIC_WEB_APPS_API_TOKEN`。
+6. Pipeline 第一次跑時，如果 Azure DevOps 要求授權使用 service connection，要按 approve。
 
 ## 之後進 AKS 的對應概念
 

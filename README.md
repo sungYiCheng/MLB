@@ -62,9 +62,17 @@ The current Azure development frontend is:
 https://yellow-forest-04081e300.5.azurestaticapps.net
 ```
 
-Before running the pipeline, create an Azure DevOps Azure Resource Manager service connection named `sc-mlb-ai-go-azure`.
+Before running the backend pipeline, create an Azure DevOps Azure Resource Manager service connection named `sc-mlb-ai-go-azure`.
 
-The pipeline uses these deployment variables in `azure-pipelines.yml`:
+The CI/CD YAML files are split by app boundary:
+
+```text
+azure-pipelines.yml           # disabled index file
+azure-pipelines-backend.yml   # backend build/image/deploy/smoke test
+azure-pipelines-frontend.yml  # frontend build/deploy/smoke test
+```
+
+The backend pipeline uses these deployment variables in `azure-pipelines-backend.yml`:
 
 ```yaml
 azureServiceConnection: 'sc-mlb-ai-go-azure'
@@ -76,6 +84,8 @@ imageRepository: 'mlb-ai-api'
 ```
 
 The backend CI/CD flow currently validates the .NET solution, runs backend unit tests, builds the backend image in ACR, deploys it to Azure Container Apps, configures the allowed frontend origin, runs smoke tests against `/health`, `/`, and the CORS response header, and then runs an optional integration check against `/api/games/today`.
+
+The frontend CI/CD flow installs Angular dependencies, builds the production frontend, deploys the built files to Azure Static Web Apps, and smoke-tests the public frontend URL. The frontend pipeline needs a secret variable named `AZURE_STATIC_WEB_APPS_API_TOKEN`.
 
 ## Frontend Commands
 
@@ -103,7 +113,7 @@ The response includes game id, official game date, UTC game time, teams, status,
 ## Next Steps
 
 1. Create an Azure DevOps Azure Resource Manager service connection.
-2. Push `azure-pipelines.yml` to Azure DevOps and run the backend pipeline.
-3. Add frontend deployment to Azure Static Web Apps from Azure DevOps.
-4. Add automated tests and stricter deployment gates.
+2. Push split pipeline YAML files to Azure DevOps.
+3. Run the backend and frontend pipelines.
+4. Add stricter deployment gates.
 5. Move the same image flow to AKS when ready.
