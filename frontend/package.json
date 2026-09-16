@@ -6,8 +6,10 @@
     "start": "ng serve --proxy-config proxy.conf.json --host 127.0.0.1 --port 53180",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "vitest run",
-    "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=./test-results/junit.xml"
+    "test": "vitest run --config vitest.config.ts",
+    "test:ci": "vitest run --config vitest.config.ts --reporter=default --reporter=junit --outputFile=./test-results/junit.xml",
+    "e2e": "playwright test",
+    "e2e:ci": "playwright test"
   },
   "prettier": {
     "printWidth": 100,
@@ -39,6 +41,7 @@
     "@angular/compiler-cli": "^21.0.0",
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
+    "@playwright/test": "^1.63.0",
     "typescript": "~5.9.2",
     "vitest": "^4.1.11"
   }

@@ -75,7 +75,7 @@ azure-pipelines-frontend.yml
 | --- | --- |
 | `ValidateFrontend` | 安裝 Node.js、執行 `npm ci`、跑 Vitest unit tests、發布測試結果、build Angular production bundle，並發布 build artifact |
 | `DeployFrontend` | 使用 Azure Static Web Apps deployment token 將前端靜態檔部署到 Azure |
-| `FrontendSmokeTest` | 驗證公開前端網址可以回應，且 HTML 裡有 Angular root element |
+| `FrontendSmokeTest` | 驗證公開前端網址可以回應，且 HTML 裡有 Angular root element，接著用 Playwright 跑 deployed-site E2E tests |
 
 前端 pipeline 只有在這些路徑變更時自動觸發：
 
@@ -117,6 +117,34 @@ npm run test:ci
 
 ```text
 frontend/test-results/junit.xml
+```
+
+前端目前也使用 Playwright 做 E2E tests：
+
+```text
+frontend/e2e/dashboard.spec.ts
+frontend/playwright.config.ts
+```
+
+這批測試會在前端部署到 Azure Static Web Apps 之後執行，直接打公開網址：
+
+```text
+E2E_BASE_URL=https://yellow-forest-04081e300.5.azurestaticapps.net
+npm run e2e:ci
+```
+
+目前 E2E tests 先檢查：
+
+- dashboard shell 可以載入
+- 主要標題與 summary 欄位存在
+- Daily Board 區塊可以收合與展開
+- 初始資料載入流程會結束
+- 沒有前端 runtime page error
+
+Playwright 也會輸出 JUnit 報表：
+
+```text
+frontend/test-results/e2e-junit.xml
 ```
 
 ## Unit Test 位置

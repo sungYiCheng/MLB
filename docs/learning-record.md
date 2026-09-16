@@ -215,6 +215,29 @@ npm test
 npm run test:ci
 ```
 
+前端也已加入 Playwright E2E tests：
+
+```text
+frontend/playwright.config.ts
+frontend/e2e/dashboard.spec.ts
+```
+
+E2E tests 會用真正的 Chromium 瀏覽器打開頁面，檢查使用者實際會碰到的流程。目前先測：
+
+- dashboard shell 是否載入
+- 主要標題與 summary 是否存在
+- Daily Board 是否能收合與展開
+- 部署後的資料載入是否會結束
+- 是否有前端 runtime page error
+
+本機測 deployed site：
+
+```powershell
+cd frontend
+$env:E2E_BASE_URL = 'https://yellow-forest-04081e300.5.azurestaticapps.net'
+npm run e2e:ci
+```
+
 ## Git 與 Remote 筆記
 
 目前 remotes：

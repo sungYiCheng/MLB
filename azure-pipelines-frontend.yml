@@ -91,16 +91,48 @@ stages:
               azure_static_web_apps_api_token: '$(AZURE_STATIC_WEB_APPS_API_TOKEN)'
 
   - stage: FrontendSmokeTest
-    displayName: Smoke test frontend
+    displayName: Smoke and E2E test frontend
     dependsOn: DeployFrontend
     condition: succeeded()
     jobs:
       - job: ProbeFrontend
-        displayName: Probe Static Web Apps site
+        displayName: Probe and test Static Web Apps site
         steps:
+          - task: UseNode@1
+            displayName: Install Node.js
+            inputs:
+              version: '24.x'
+
+          - script: npm ci
+            displayName: Install frontend dependencies
+            workingDirectory: '$(appDirectory)'
+
           - script: |
               set -euo pipefail
               echo "Checking $(staticWebAppUrl)"
               html="$(curl --retry 5 --retry-delay 10 --retry-all-errors --fail "$(staticWebAppUrl)")"
               echo "$html" | grep -q '<app-root'
             displayName: Verify frontend responds
+
+          - script: npx playwright install --with-deps chromium
+            displayName: Install Playwright browser
+            workingDirectory: '$(appDirectory)'
+
+          - script: npm run e2e:ci
+            displayName: Run frontend E2E tests
+            workingDirectory: '$(appDirectory)'
+            env:
+              E2E_BASE_URL: '$(staticWebAppUrl)'
+
+          - task: PublishTestResults@2
+            displayName: Publish frontend E2E test results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: '$(appDirectory)/test-results/e2e-junit.xml'
+              failTaskOnFailedTests: true
+
+          - publish: '$(appDirectory)/test-results'
+            artifact: frontend-e2e-results
+            displayName: Publish frontend E2E artifacts
+            condition: failed()
