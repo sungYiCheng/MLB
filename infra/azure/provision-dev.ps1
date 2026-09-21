@@ -320,6 +320,7 @@ if ($appExists) {
         'ASPNETCORE_ENVIRONMENT=Development',
         "Cors__AllowedOrigins__0=$frontendOrigin",
         "APPLICATIONINSIGHTS_CONNECTION_STRING=$applicationInsightsConnectionString",
+        "ApplicationInsights__ConnectionString=$applicationInsightsConnectionString",
         '--min-replicas', $backendMinReplicas,
         '--max-replicas', $backendMaxReplicas
     )
@@ -340,7 +341,8 @@ if ($appExists) {
         '--env-vars',
         'ASPNETCORE_ENVIRONMENT=Development',
         "Cors__AllowedOrigins__0=$frontendOrigin",
-        "APPLICATIONINSIGHTS_CONNECTION_STRING=$applicationInsightsConnectionString"
+        "APPLICATIONINSIGHTS_CONNECTION_STRING=$applicationInsightsConnectionString",
+        "ApplicationInsights__ConnectionString=$applicationInsightsConnectionString"
     )
 }
 

@@ -122,6 +122,7 @@ stages:
                 if [ -n "${app_insights_connection_string}" ]; then
                   echo "Application Insights resource found. Telemetry connection string will be configured."
                   env_vars+=("APPLICATIONINSIGHTS_CONNECTION_STRING=${app_insights_connection_string}")
+                  env_vars+=("ApplicationInsights__ConnectionString=${app_insights_connection_string}")
                 else
                   echo "Application Insights resource not found. Skipping telemetry connection string for this deployment."
                 fi

@@ -121,6 +121,7 @@ Backend 會透過這個環境變數接上 Application Insights：
 
 ```text
 APPLICATIONINSIGHTS_CONNECTION_STRING
+ApplicationInsights__ConnectionString
 ```
 
 這個值由 infra script 或 backend pipeline 從 Azure 查出後注入 Container App，不會寫進 repo。
