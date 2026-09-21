@@ -95,7 +95,7 @@ imageBuildTag: 'build-$(Build.BuildId)'
 imageDevLatestTag: 'dev-latest'
 ```
 
-The backend CI/CD flow currently validates the .NET solution, runs backend unit tests, builds the backend image in ACR, tags the image with commit/build/dev tags, deploys the commit-tagged image to Azure Container Apps, configures the allowed frontend origin, injects the Application Insights connection string, runs smoke tests against `/health`, `/`, and the CORS response header, and then runs an optional integration check against `/api/games/today`.
+The backend CI/CD flow currently validates the .NET solution, runs backend unit tests, builds the backend image in ACR, tags the image with commit/build/dev tags, deploys the commit-tagged image to Azure Container Apps, configures the allowed frontend origin, injects the Application Insights connection string when the resource exists, runs smoke tests against `/health`, `/`, and the CORS response header, and then runs an optional integration check against `/api/games/today`.
 
 Backend image tags:
 

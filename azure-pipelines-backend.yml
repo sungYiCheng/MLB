@@ -110,7 +110,21 @@ stages:
                   --name "$(applicationInsightsName)" \
                   --resource-type "Microsoft.Insights/components" \
                   --query "properties.ConnectionString" \
-                  --output tsv)"
+                  --output tsv 2>/dev/null || true)"
+
+                env_vars=(
+                  "Cors__AllowedOrigins__0=$(frontendDevUrl)"
+                  "AppVersion=$(Build.SourceVersion)"
+                  "AppBuildId=$(Build.BuildId)"
+                  "AppImageTag=$(imageCommitTag)"
+                )
+
+                if [ -n "${app_insights_connection_string}" ]; then
+                  echo "Application Insights resource found. Telemetry connection string will be configured."
+                  env_vars+=("APPLICATIONINSIGHTS_CONNECTION_STRING=${app_insights_connection_string}")
+                else
+                  echo "Application Insights resource not found. Skipping telemetry connection string for this deployment."
+                fi
 
                 echo "Deploying ${image} to $(containerAppName)"
                 echo "Also tagged as $(imageRepository):$(imageBuildTag) and $(imageRepository):$(imageDevLatestTag)"
@@ -119,12 +133,7 @@ stages:
                   --resource-group "$(resourceGroupName)" \
                   --name "$(containerAppName)" \
                   --image "${image}" \
-                  --set-env-vars \
-                    "Cors__AllowedOrigins__0=$(frontendDevUrl)" \
-                    "AppVersion=$(Build.SourceVersion)" \
-                    "AppBuildId=$(Build.BuildId)" \
-                    "AppImageTag=$(imageCommitTag)" \
-                    "APPLICATIONINSIGHTS_CONNECTION_STRING=${app_insights_connection_string}"
+                  --set-env-vars "${env_vars[@]}"
 
                 az containerapp revision list \
                   --resource-group "$(resourceGroupName)" \

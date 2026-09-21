@@ -159,6 +159,8 @@ APPLICATIONINSIGHTS_CONNECTION_STRING
 
 這個值不寫進 repo，也不放在 YAML 裡。Pipeline 每次部署時從 Azure resource 查出來，再塞進正在部署的 Container App revision。
 
+目前 backend pipeline 做成容錯設計：如果 `appi-mlb-ai-api-dev` 還沒有被 infra pipeline 建立，部署仍會繼續，只是 `/health` 會顯示 `application-insights` 為 `not-configured`。等 infra apply 完、Application Insights resource 存在後，下一次 backend deploy 就會自動注入 connection string。
+
 完成後可以在 Azure Portal 的 Application Insights 裡看：
 
 - requests
