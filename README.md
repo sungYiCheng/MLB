@@ -13,6 +13,7 @@ Practice notes, architecture diagrams, Azure deployment records, and current nex
 
 - [docs/learning-record.md](docs/learning-record.md)
 - [docs/configuration-management.md](docs/configuration-management.md)
+- [infra/azure/README.md](infra/azure/README.md)
 
 ## Current Status
 
@@ -68,8 +69,15 @@ The CI/CD YAML files are split by app boundary:
 
 ```text
 azure-pipelines.yml           # disabled index file
+azure-pipelines-infra.yml     # manual infra provisioning pipeline
 azure-pipelines-backend.yml   # backend build/image/deploy/smoke test
 azure-pipelines-frontend.yml  # frontend build/deploy/smoke test
+```
+
+The current Azure dev resources are documented as reusable provisioning scripts under:
+
+```text
+infra/azure
 ```
 
 The backend pipeline uses these deployment variables in `azure-pipelines-backend.yml`:
@@ -80,10 +88,43 @@ resourceGroupName: 'rg-mlb-ai-go-dev'
 containerAppName: 'ca-mlb-ai-api'
 frontendDevUrl: 'https://yellow-forest-04081e300.5.azurestaticapps.net'
 acrName: 'acrmlbaigo'
+applicationInsightsName: 'appi-mlb-ai-api-dev'
 imageRepository: 'mlb-ai-api'
+imageCommitTag: '$(Build.SourceVersion)'
+imageBuildTag: 'build-$(Build.BuildId)'
+imageDevLatestTag: 'dev-latest'
 ```
 
-The backend CI/CD flow currently validates the .NET solution, runs backend unit tests, builds the backend image in ACR, deploys it to Azure Container Apps, configures the allowed frontend origin, runs smoke tests against `/health`, `/`, and the CORS response header, and then runs an optional integration check against `/api/games/today`.
+The backend CI/CD flow currently validates the .NET solution, runs backend unit tests, builds the backend image in ACR, tags the image with commit/build/dev tags, deploys the commit-tagged image to Azure Container Apps, configures the allowed frontend origin, injects the Application Insights connection string, runs smoke tests against `/health`, `/`, and the CORS response header, and then runs an optional integration check against `/api/games/today`.
+
+Backend image tags:
+
+| Tag | Purpose |
+| --- | --- |
+| `$(Build.SourceVersion)` | Exact commit deployed to Azure |
+| `build-$(Build.BuildId)` | Azure DevOps pipeline run lookup |
+| `dev-latest` | Latest successful dev backend image |
+
+The backend `/health` response includes deployment metadata for the running revision:
+
+```json
+{
+  "deployment": {
+    "version": "<commit-sha>",
+    "buildId": "<azure-devops-build-id>",
+    "imageTag": "<image-tag>"
+  }
+}
+```
+
+The backend also reports whether Application Insights telemetry is configured:
+
+```json
+{
+  "name": "application-insights",
+  "status": "configured"
+}
+```
 
 The frontend CI/CD flow installs Angular dependencies, runs Vitest unit tests, publishes JUnit test results, builds the production frontend, deploys the built files to Azure Static Web Apps, smoke-tests the public frontend URL, and runs Playwright E2E tests against the deployed site. The frontend pipeline needs a secret variable named `AZURE_STATIC_WEB_APPS_API_TOKEN`.
 

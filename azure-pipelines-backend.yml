@@ -23,10 +23,13 @@ variables:
   containerAppUrl: 'https://ca-mlb-ai-api.wonderfulpond-0bfd6efa.eastasia.azurecontainerapps.io'
   frontendDevUrl: 'https://yellow-forest-04081e300.5.azurestaticapps.net'
   acrName: 'acrmlbaigo'
+  applicationInsightsName: 'appi-mlb-ai-api-dev'
   imageRepository: 'mlb-ai-api'
   dockerfilePath: 'backend/Dockerfile'
   buildContext: 'backend'
-  imageTag: '$(Build.SourceVersion)'
+  imageCommitTag: '$(Build.SourceVersion)'
+  imageBuildTag: 'build-$(Build.BuildId)'
+  imageDevLatestTag: 'dev-latest'
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -78,8 +81,9 @@ stages:
               inlineScript: |
                 az acr build \
                   --registry "$(acrName)" \
-                  --image "$(imageRepository):$(imageTag)" \
-                  --image "$(imageRepository):latest" \
+                  --image "$(imageRepository):$(imageCommitTag)" \
+                  --image "$(imageRepository):$(imageBuildTag)" \
+                  --image "$(imageRepository):$(imageDevLatestTag)" \
                   --file "$(dockerfilePath)" \
                   "$(buildContext)"
 
@@ -100,14 +104,27 @@ stages:
               inlineScript: |
                 set -euo pipefail
 
-                image="$(acrName).azurecr.io/$(imageRepository):$(imageTag)"
+                image="$(acrName).azurecr.io/$(imageRepository):$(imageCommitTag)"
+                app_insights_connection_string="$(az resource show \
+                  --resource-group "$(resourceGroupName)" \
+                  --name "$(applicationInsightsName)" \
+                  --resource-type "Microsoft.Insights/components" \
+                  --query "properties.ConnectionString" \
+                  --output tsv)"
+
                 echo "Deploying ${image} to $(containerAppName)"
+                echo "Also tagged as $(imageRepository):$(imageBuildTag) and $(imageRepository):$(imageDevLatestTag)"
 
                 az containerapp update \
                   --resource-group "$(resourceGroupName)" \
                   --name "$(containerAppName)" \
                   --image "${image}" \
-                  --set-env-vars "Cors__AllowedOrigins__0=$(frontendDevUrl)"
+                  --set-env-vars \
+                    "Cors__AllowedOrigins__0=$(frontendDevUrl)" \
+                    "AppVersion=$(Build.SourceVersion)" \
+                    "AppBuildId=$(Build.BuildId)" \
+                    "AppImageTag=$(imageCommitTag)" \
+                    "APPLICATIONINSIGHTS_CONNECTION_STRING=${app_insights_connection_string}"
 
                 az containerapp revision list \
                   --resource-group "$(resourceGroupName)" \
@@ -133,6 +150,11 @@ stages:
               echo "$health_response" | grep -q '"api-process"'
               echo "$health_response" | grep -q '"mlb-stats-api-client"'
               echo "$health_response" | grep -q '"cors-allowed-origins"'
+              echo "$health_response" | grep -q '"deployment"'
+              echo "$health_response" | grep -q '"version"'
+              echo "$health_response" | grep -q '"buildId"'
+              echo "$health_response" | grep -q '"imageTag"'
+              echo "$health_response" | grep -q '"application-insights"'
 
               echo
               echo "Checking $(containerAppUrl)/"

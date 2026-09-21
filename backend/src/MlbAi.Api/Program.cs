@@ -8,6 +8,22 @@ var builder = WebApplication.CreateBuilder(args);
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>() ?? [];
+var appInsightsConnectionString =
+    builder.Configuration["ApplicationInsights:ConnectionString"] ??
+    builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
+var isApplicationInsightsConfigured = !string.IsNullOrWhiteSpace(appInsightsConnectionString);
+var deploymentInfo = new DeploymentInfo(
+    Version: builder.Configuration["AppVersion"] ?? "local",
+    BuildId: builder.Configuration["AppBuildId"] ?? "local",
+    ImageTag: builder.Configuration["AppImageTag"] ?? "local");
+
+if (isApplicationInsightsConfigured)
+{
+    builder.Services.AddApplicationInsightsTelemetry(options =>
+    {
+        options.ConnectionString = appInsightsConnectionString;
+    });
+}
 
 builder.Services
     .AddHttpClient<IMlbService, MlbStatsService>(client =>
@@ -56,13 +72,20 @@ app.MapGet("/health", (IHostEnvironment environment) =>
         new HealthCheckItem(
             Name: "cors-allowed-origins",
             Status: allowedOrigins.Length > 0 ? "configured" : "not-configured",
-            Description: $"{allowedOrigins.Length} allowed origin(s) configured.")
+            Description: $"{allowedOrigins.Length} allowed origin(s) configured."),
+        new HealthCheckItem(
+            Name: "application-insights",
+            Status: isApplicationInsightsConfigured ? "configured" : "not-configured",
+            Description: isApplicationInsightsConfigured
+                ? "Application Insights telemetry is configured for this process."
+                : "Application Insights telemetry is not configured for this process.")
     };
 
     return Results.Ok(new HealthResponse(
         Service: appName,
         Status: "healthy",
         Environment: environment.EnvironmentName,
+        Deployment: deploymentInfo,
         TimestampUtc: DateTimeOffset.UtcNow,
         Checks: checks));
 });
@@ -142,6 +165,7 @@ internal sealed record HealthResponse(
     string Service,
     string Status,
     string Environment,
+    DeploymentInfo Deployment,
     DateTimeOffset TimestampUtc,
     IReadOnlyList<HealthCheckItem> Checks);
 
@@ -149,3 +173,8 @@ internal sealed record HealthCheckItem(
     string Name,
     string Status,
     string Description);
+
+internal sealed record DeploymentInfo(
+    string Version,
+    string BuildId,
+    string ImageTag);

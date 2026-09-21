@@ -1,0 +1,36 @@
+trigger: none
+pr: none
+
+parameters:
+  - name: planOnly
+    displayName: Plan only
+    type: boolean
+    default: true
+
+variables:
+  azureServiceConnection: 'sc-mlb-ai-go-azure'
+
+pool:
+  vmImage: 'windows-latest'
+
+stages:
+  - stage: ProvisionDevInfra
+    displayName: Provision dev Azure infrastructure
+    jobs:
+      - job: Provision
+        displayName: Run Azure infra script
+        steps:
+          - task: AzureCLI@2
+            displayName: Run provision-dev.ps1
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: ps
+              scriptLocation: inlineScript
+              inlineScript: |
+                $arguments = @()
+
+                if ('${{ parameters.planOnly }}' -eq 'true') {
+                  $arguments += '-PlanOnly'
+                }
+
+                ./infra/azure/provision-dev.ps1 @arguments

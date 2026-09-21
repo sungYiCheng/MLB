@@ -21,6 +21,7 @@ push 到 Azure DevOps main
 
 ```text
 azure-pipelines.yml           # 停用的總入口，只保留說明
+azure-pipelines-infra.yml     # 手動觸發的 Azure dev 資源建置流程
 azure-pipelines-backend.yml   # 後端 CI/CD
 azure-pipelines-frontend.yml  # 前端 CI/CD
 ```
@@ -33,6 +34,35 @@ pr: none
 ```
 
 這樣可以避免 Azure DevOps 預設抓根目錄 YAML 時，不小心把前後端一起部署。真正會跑的是另外兩支 pipeline YAML。
+
+## Infra Pipeline
+
+基礎設施 pipeline 檔案：
+
+```text
+azure-pipelines-infra.yml
+```
+
+這條 pipeline 預設：
+
+```yaml
+trigger: none
+pr: none
+```
+
+也就是不會因為 push 自動執行，需要從 Azure DevOps 手動啟動。它會呼叫：
+
+```text
+infra/azure/provision-dev.ps1
+```
+
+目前有一個參數：
+
+| Parameter | Default | 目的 |
+| --- | --- | --- |
+| `planOnly` | `true` | 只印出 Azure CLI 指令，不真的建立或更新 Azure 資源 |
+
+這樣可以先練習 infra provisioning 的流程，又不會不小心重建或修改雲端資源。
 
 ## Backend Pipeline
 
@@ -60,6 +90,84 @@ azure-pipelines-backend.yml
 backend/**
 azure-pipelines-backend.yml
 ```
+
+### Backend image tag strategy
+
+後端 pipeline 目前會用同一份 build 產生三個 ACR image tag：
+
+| Tag | 範例 | 用途 |
+| --- | --- | --- |
+| Commit SHA | `6a07cad...` | 精準知道部署的是哪一版程式碼 |
+| Build ID | `build-15` | 對回 Azure DevOps pipeline run |
+| Dev latest | `dev-latest` | 代表 dev 環境最近一次成功 build 的 backend image |
+
+實際部署到 Container Apps 時，使用的是 commit SHA tag：
+
+```text
+acrmlbaigo.azurecr.io/mlb-ai-api:<commit-sha>
+```
+
+這樣做的好處是 Azure 上每個 revision 都可以追到明確 commit，不會只看到模糊的 `latest`。
+
+部署時也會寫入這些環境變數：
+
+```text
+AppVersion=<commit-sha>
+AppBuildId=<azure-devops-build-id>
+AppImageTag=<commit-sha>
+APPLICATIONINSIGHTS_CONNECTION_STRING=<azure-managed-connection-string>
+```
+
+後端 `/health` 會回報：
+
+```json
+{
+  "deployment": {
+    "version": "<commit-sha>",
+    "buildId": "<azure-devops-build-id>",
+    "imageTag": "<image-tag>"
+  }
+}
+```
+
+之後進 AKS 時，同樣可以把這個策略套到 Kubernetes Deployment image tag 和 rollout/rollback 流程。
+
+### Backend observability
+
+後端現在有接 Application Insights SDK：
+
+```text
+Microsoft.ApplicationInsights.AspNetCore
+```
+
+Backend pipeline 在部署前會用 Azure CLI 查詢 Application Insights resource：
+
+```bash
+az resource show \
+  --resource-group "$(resourceGroupName)" \
+  --name "$(applicationInsightsName)" \
+  --resource-type "Microsoft.Insights/components" \
+  --query "properties.ConnectionString" \
+  --output tsv
+```
+
+查到的 connection string 會用 Container Apps environment variable 注入：
+
+```text
+APPLICATIONINSIGHTS_CONNECTION_STRING
+```
+
+這個值不寫進 repo，也不放在 YAML 裡。Pipeline 每次部署時從 Azure resource 查出來，再塞進正在部署的 Container App revision。
+
+完成後可以在 Azure Portal 的 Application Insights 裡看：
+
+- requests
+- failures
+- performance
+- dependencies
+- live metrics
+
+也可以在 Log Analytics Workspace 裡用 KQL 查 Container Apps logs。
 
 ## Frontend Pipeline
 
@@ -190,6 +298,15 @@ GET /health
 | `api-process` | 確認 API process 活著，而且 HTTP pipeline 可以回應 |
 | `mlb-stats-api-client` | 確認 MLB Stats API client 有設定 base URL，但不真的呼叫外部服務 |
 | `cors-allowed-origins` | 確認後端有載入 CORS allowed origins 設定 |
+| `application-insights` | 確認後端 process 有載入 Application Insights connection string |
+
+`/health` 也會回傳目前部署版本：
+
+| Field | 目的 |
+| --- | --- |
+| `deployment.version` | 目前執行中的 commit SHA |
+| `deployment.buildId` | 對應的 Azure DevOps build id |
+| `deployment.imageTag` | Container App 目前使用的 image tag |
 
 Pipeline 的 `SmokeTest` stage 會檢查：
 
@@ -206,6 +323,11 @@ CORS response header
 "api-process"
 "mlb-stats-api-client"
 "cors-allowed-origins"
+"deployment"
+"version"
+"buildId"
+"imageTag"
+"application-insights"
 ```
 
 CORS header 檢查會帶上 Azure Static Web Apps 的 origin，確認後端回傳相同的 `access-control-allow-origin`。

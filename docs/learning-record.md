@@ -1,6 +1,6 @@
 # MLB AI Daily 練習紀錄
 
-最後更新：2026-09-14
+最後更新：2026-09-21
 
 ## 目標
 
@@ -31,8 +31,10 @@
 |   +-- package.json
 |   +-- src/
 +-- azure-pipelines.yml
++-- azure-pipelines-infra.yml
 +-- azure-pipelines-backend.yml
 +-- azure-pipelines-frontend.yml
++-- infra/
 +-- docs/
 +-- PROJECT_CONTEXT.md
 +-- README.md
@@ -55,6 +57,8 @@ flowchart LR
     AzureDevOps[Azure DevOps Repo] --> Source
     Source --> ACR[Azure Container Registry<br/>後端 Image]
     ACR --> API
+    API --> AppInsights[Application Insights<br/>requests / errors / latency]
+    API --> LogAnalytics[Log Analytics<br/>container logs]
 ```
 
 ## 執行流程
@@ -108,6 +112,7 @@ flowchart TD
 
 ```text
 azure-pipelines.yml           # 停用的總入口
+azure-pipelines-infra.yml     # 手動觸發的 infra provisioning pipeline
 azure-pipelines-backend.yml   # 後端 pipeline
 azure-pipelines-frontend.yml  # 前端 pipeline
 ```
@@ -119,6 +124,105 @@ sc-mlb-ai-go-azure
 ```
 
 這個 service connection 需要在 Azure DevOps 專案中建立，並授權它能操作目前的 Azure resource group 與 Container Apps。
+
+## Backend Image Tag 策略
+
+後端 image 現在不再只依賴單一 `latest` 概念，而是同一次 ACR build 會產生三種 tag：
+
+```text
+mlb-ai-api:<commit-sha>
+mlb-ai-api:build-<azure-devops-build-id>
+mlb-ai-api:dev-latest
+```
+
+其中實際部署到 Azure Container Apps 的是 `<commit-sha>`，這樣每個 Container Apps revision 都能追到明確程式版本。
+
+部署時 backend pipeline 也會寫入：
+
+```text
+AppVersion
+AppBuildId
+AppImageTag
+```
+
+所以 `/health` 會多回傳 deployment metadata，方便確認目前 Azure 上跑的是哪次 commit / build。
+
+## Observability 觀測
+
+目前後端已開始接 Azure 觀測資源：
+
+```text
+Application Insights
+Log Analytics Workspace
+```
+
+Application Insights 偏向看應用程式層級：
+
+- request 次數
+- response time
+- failed requests
+- dependency calls
+- exception / failure
+
+Log Analytics Workspace 偏向收集與查詢 logs：
+
+- Container Apps console logs
+- 平台 logs
+- KQL 查詢
+
+後端透過這個環境變數連到 Application Insights：
+
+```text
+APPLICATIONINSIGHTS_CONNECTION_STRING
+```
+
+這個值由 infra script 或 backend pipeline 從 Azure resource 查出來後注入 Container App，不會寫死在 repo。
+
+`/health` 現在也會有：
+
+```text
+application-insights
+```
+
+用來確認目前 backend process 是否已經拿到 Application Insights connection string。
+
+## Azure Infra Provisioning
+
+目前已開始把 Azure dev 資源整理成可重跑的基礎設施腳本：
+
+```text
+infra/azure/
+  README.md
+  variables.dev.ps1
+  provision-dev.ps1
+```
+
+這一層的目的不是取代前後端 pipeline，而是補上「雲端資源本身怎麼建立」這塊。
+
+目前 `provision-dev.ps1` 會描述並建立：
+
+- Resource group
+- Log Analytics Workspace
+- Application Insights
+- Azure Container Registry
+- User-assigned managed identity
+- Container Apps environment
+- Backend Container App
+- Static Web App shell
+
+預設可以先用 dry run 看它會執行哪些 Azure CLI 指令：
+
+```powershell
+.\infra\azure\provision-dev.ps1 -PlanOnly
+```
+
+Azure DevOps 也新增手動觸發的：
+
+```text
+azure-pipelines-infra.yml
+```
+
+它預設 `planOnly=true`，所以第一次跑只會印出計畫，不會真的動 Azure 資源。
 
 ## 重要本機 Port
 
@@ -138,7 +242,8 @@ sc-mlb-ai-go-azure
 | Backend scale | `minReplicas=0`, `maxReplicas=1` |
 | Backend size | `0.25 CPU`, `0.5Gi memory` |
 | Container registry | Azure Container Registry Basic |
-| Logs | Container Apps 自動建立的 Log Analytics workspace |
+| Logs | `log-mlb-ai-go-dev` Log Analytics Workspace |
+| App telemetry | `appi-mlb-ai-api-dev` Application Insights |
 
 目前開發環境網址：
 
@@ -266,16 +371,17 @@ azure  -> Azure DevOps
 - 使用 Azure ACR cloud build，在 Azure 上 build Docker image。
 - 前端部署到 Azure Static Web Apps。
 - 後端部署到 Azure Container Apps，不先使用 VM 或 AKS。
+- Azure dev 資源先用 Azure CLI + PowerShell 腳本整理，之後可再轉成 Bicep 或 Terraform。
+- 後端接 Application Insights，開始練習部署後觀測。
 - AKS 保留成後續進階練習。
 
 ## 目前下一步
 
-1. 將這次 pipeline 變更 push 到 Azure DevOps。
-2. 確認 backend pipeline 可以自動部署到 Container Apps。
-3. 確認 frontend pipeline 可以自動部署到 Static Web Apps。
-4. 檢查 backend/frontend smoke test 結果。
-5. 每次練習完，到 Azure Cost Management 看一下成本。
-6. 之後再加入 AKS 練習，例如 start/stop 或用 IaC 每次重建。
+1. 先審閱 `infra/azure/provision-dev.ps1 -PlanOnly` 的輸出，確認每個 Azure 資源建立步驟都看得懂。
+2. 將 `azure-pipelines-infra.yml` push 到 Azure DevOps 後，建立手動觸發的 infra pipeline。
+3. 第一次在 Azure DevOps 跑 infra pipeline 時保持 `planOnly=true`。
+4. 確認 dry run 沒問題後，再手動改成 `planOnly=false` 建立或更新 dev 資源。
+5. 下一個強化方向可以是先實際跑 infra/backend pipeline，確認 Application Insights 收到 telemetry，或再往 AKS 前進。
 
 更細的 Azure DevOps CI/CD 操作筆記放在：
 
