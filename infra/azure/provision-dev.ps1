@@ -1,6 +1,7 @@
 param(
     [string]$SubscriptionId,
-    [switch]$PlanOnly
+    [switch]$PlanOnly,
+    [switch]$EnableAlertRules
 )
 
 Set-StrictMode -Version Latest
@@ -14,6 +15,10 @@ $configPath = Join-Path $scriptRoot 'variables.dev.ps1'
 
 if ($SubscriptionId) {
     $AzureInfraConfig.SubscriptionId = $SubscriptionId
+}
+
+if ($EnableAlertRules) {
+    $AzureInfraConfig.EnableAlertRules = $true
 }
 
 function Invoke-AzCli {
@@ -66,6 +71,94 @@ function Test-AzResourceExists {
     return $LASTEXITCODE -eq 0
 }
 
+function New-ScheduledQueryRuleProperties {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DisplayName,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Description,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ApplicationInsightsId,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Query,
+
+        [Parameter(Mandatory = $true)]
+        [string]$TimeAggregation,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Operator,
+
+        [Parameter(Mandatory = $true)]
+        [double]$Threshold,
+
+        [Parameter(Mandatory = $true)]
+        [string]$EvaluationFrequency,
+
+        [Parameter(Mandatory = $true)]
+        [string]$WindowSize,
+
+        [Parameter(Mandatory = $true)]
+        [int]$Severity
+    )
+
+    return [ordered]@{
+        location = 'global'
+        properties = [ordered]@{
+            displayName = $DisplayName
+            description = $Description
+            severity = $Severity
+            enabled = $true
+            scopes = @($ApplicationInsightsId)
+            evaluationFrequency = $EvaluationFrequency
+            windowSize = $WindowSize
+            criteria = [ordered]@{
+                allOf = @(
+                    [ordered]@{
+                        query = $Query
+                        timeAggregation = $TimeAggregation
+                        operator = $Operator
+                        threshold = $Threshold
+                        failingPeriods = [ordered]@{
+                            numberOfEvaluationPeriods = 1
+                            minFailingPeriodsToAlert = 1
+                        }
+                    }
+                )
+            }
+            autoMitigate = $true
+            actions = [ordered]@{
+                actionGroups = @()
+            }
+        }
+    }
+}
+
+function Invoke-ScheduledQueryRuleUpsert {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RuleName,
+
+        [Parameter(Mandatory = $true)]
+        [object]$RuleObject
+    )
+
+    $rulePath = Join-Path ([System.IO.Path]::GetTempPath()) "$RuleName.json"
+    $RuleObject | ConvertTo-Json -Depth 20 -Compress | Set-Content -LiteralPath $rulePath -Encoding utf8
+
+    Invoke-AzCli -Arguments @(
+        'resource', 'create',
+        '--resource-group', $resourceGroupName,
+        '--name', $RuleName,
+        '--resource-type', 'Microsoft.Insights/scheduledQueryRules',
+        '--api-version', '2022-06-15',
+        '--is-full-object',
+        '--properties', "@$rulePath"
+    )
+}
+
 $subscription = $AzureInfraConfig.SubscriptionId
 $location = $AzureInfraConfig.Location
 $staticWebAppLocation = $AzureInfraConfig.StaticWebAppLocation
@@ -74,6 +167,14 @@ $logAnalyticsWorkspaceName = $AzureInfraConfig.LogAnalyticsWorkspaceName
 $logAnalyticsRetentionDays = [string]$AzureInfraConfig.LogAnalyticsRetentionDays
 $logAnalyticsDailyQuotaGb = [string]$AzureInfraConfig.LogAnalyticsDailyQuotaGb
 $applicationInsightsName = $AzureInfraConfig.ApplicationInsightsName
+$enableAlertRules = [bool]$AzureInfraConfig.EnableAlertRules
+$alertEvaluationFrequency = $AzureInfraConfig.AlertEvaluationFrequency
+$alertWindowSize = $AzureInfraConfig.AlertWindowSize
+$alertSeverity = [int]$AzureInfraConfig.AlertSeverity
+$backend5xxAlertName = $AzureInfraConfig.Backend5xxAlertName
+$backendSlowRequestAlertName = $AzureInfraConfig.BackendSlowRequestAlertName
+$backendHealthMissingAlertName = $AzureInfraConfig.BackendHealthMissingAlertName
+$backendSlowRequestThresholdMs = [double]$AzureInfraConfig.BackendSlowRequestThresholdMs
 $acrName = $AzureInfraConfig.AcrName
 $imageRepository = $AzureInfraConfig.ImageRepository
 $imageTag = $AzureInfraConfig.ImageTag
@@ -252,6 +353,75 @@ $applicationInsightsConnectionString = Invoke-AzCli -Arguments @(
     '--output', 'tsv'
 ) -CaptureOutput
 
+$applicationInsightsResourceId = Invoke-AzCli -Arguments @(
+    'resource', 'show',
+    '--resource-group', $resourceGroupName,
+    '--name', $applicationInsightsName,
+    '--resource-type', 'Microsoft.Insights/components',
+    '--query', 'id',
+    '--output', 'tsv'
+) -CaptureOutput
+
+if ($enableAlertRules) {
+    $backend5xxQuery = @'
+AppRequests
+| where TimeGenerated > ago(5m)
+| where ResultCode startswith "5"
+| summarize AggregatedValue=count()
+'@
+
+    $backendSlowRequestQuery = @'
+AppRequests
+| where TimeGenerated > ago(5m)
+| summarize AggregatedValue=avg(DurationMs)
+'@
+
+    $backendHealthMissingQuery = @'
+AppRequests
+| where TimeGenerated > ago(10m)
+| where Name == "GET /health"
+| summarize AggregatedValue=count()
+'@
+
+    Invoke-ScheduledQueryRuleUpsert -RuleName $backend5xxAlertName -RuleObject (New-ScheduledQueryRuleProperties `
+        -DisplayName 'MLB API 5xx errors' `
+        -Description 'Alert when the backend reports at least one 5xx request in the last 5 minutes.' `
+        -ApplicationInsightsId $applicationInsightsResourceId `
+        -Query $backend5xxQuery `
+        -TimeAggregation 'Count' `
+        -Operator 'GreaterThan' `
+        -Threshold 0 `
+        -EvaluationFrequency $alertEvaluationFrequency `
+        -WindowSize $alertWindowSize `
+        -Severity $alertSeverity)
+
+    Invoke-ScheduledQueryRuleUpsert -RuleName $backendSlowRequestAlertName -RuleObject (New-ScheduledQueryRuleProperties `
+        -DisplayName 'MLB API slow requests' `
+        -Description "Alert when average backend request duration is greater than $backendSlowRequestThresholdMs ms." `
+        -ApplicationInsightsId $applicationInsightsResourceId `
+        -Query $backendSlowRequestQuery `
+        -TimeAggregation 'Average' `
+        -Operator 'GreaterThan' `
+        -Threshold $backendSlowRequestThresholdMs `
+        -EvaluationFrequency $alertEvaluationFrequency `
+        -WindowSize $alertWindowSize `
+        -Severity $alertSeverity)
+
+    Invoke-ScheduledQueryRuleUpsert -RuleName $backendHealthMissingAlertName -RuleObject (New-ScheduledQueryRuleProperties `
+        -DisplayName 'MLB API health check missing' `
+        -Description 'Alert when no /health request is observed in the last 10 minutes.' `
+        -ApplicationInsightsId $applicationInsightsResourceId `
+        -Query $backendHealthMissingQuery `
+        -TimeAggregation 'Count' `
+        -Operator 'LessThan' `
+        -Threshold 1 `
+        -EvaluationFrequency $alertEvaluationFrequency `
+        -WindowSize 'PT10M' `
+        -Severity $alertSeverity)
+} else {
+    Write-Host 'Azure Monitor alert rule creation is disabled. Pass -EnableAlertRules to provision the learning alert rules.'
+}
+
 $roleAssignmentId = Invoke-AzCli -Arguments @(
     'role', 'assignment', 'list',
     '--assignee', $identityPrincipalId,
@@ -369,6 +539,7 @@ Write-Host 'Provisioning flow completed.'
 Write-Host "Resource group: $resourceGroupName"
 Write-Host "Log Analytics workspace: $logAnalyticsWorkspaceName"
 Write-Host "Application Insights: $applicationInsightsName"
+Write-Host "Alert rules enabled: $enableAlertRules"
 Write-Host "ACR: $acrName"
 Write-Host "Backend Container App: $backendContainerAppName"
 Write-Host "Static Web App: $staticWebAppName"

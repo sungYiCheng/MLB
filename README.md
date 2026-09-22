@@ -12,7 +12,10 @@ MLB AI Daily is a side-project workspace for a small full-stack web app:
 Practice notes, architecture diagrams, Azure deployment records, and current next steps are kept in:
 
 - [docs/learning-record.md](docs/learning-record.md)
+- [docs/azure-current-state.md](docs/azure-current-state.md)
 - [docs/configuration-management.md](docs/configuration-management.md)
+- [docs/observability.md](docs/observability.md)
+- [docs/kubernetes-aks-prep.md](docs/kubernetes-aks-prep.md)
 - [infra/azure/README.md](infra/azure/README.md)
 
 ## Current Status
@@ -28,6 +31,8 @@ backend/
     MlbAi.Infrastructure/
 frontend/
   src/
+k8s/
+  base/
 ```
 
 ## Backend Commands
@@ -78,6 +83,12 @@ The current Azure dev resources are documented as reusable provisioning scripts 
 
 ```text
 infra/azure
+```
+
+AKS preparation manifests are under:
+
+```text
+k8s/base
 ```
 
 The backend pipeline uses these deployment variables in `azure-pipelines-backend.yml`:

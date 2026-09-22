@@ -50,13 +50,14 @@ Browser
 | Container Apps environment | `cae-mlb-ai-go-dev` | Container Apps 的執行環境 |
 | Container App | `ca-mlb-ai-api` | 執行 .NET backend API |
 | Static Web App | `swa-mlb-ai-go-dev` | 部署 Angular frontend |
-| User-assigned identity | `id-mlb-ai-api-dev` | 讓 backend app 可以用受控身分拉 ACR image |
+| User-assigned identity | `id-mlb-ai-go-acr-pull` | 讓 backend app 可以用受控身分拉 ACR image |
 
 ## Files
 
 ```text
 infra/azure/
   README.md              # 這份說明
+  queries/               # Log Analytics / Application Insights KQL 查詢範本
   variables.dev.ps1      # dev 環境參數
   provision-dev.ps1      # 建立或更新 dev Azure 資源
 ```
@@ -107,6 +108,7 @@ azure-pipelines-infra.yml
 10. 用 ACR Tasks 從 `backend/Dockerfile` build backend image。
 11. 建立或更新 backend Container App，並注入 Application Insights connection string。
 12. 建立 Static Web App shell。
+13. 如果傳入 `-EnableAlertRules`，建立學習用 Azure Monitor alert rules。
 
 ## Observability
 
@@ -136,6 +138,26 @@ ApplicationInsights__ConnectionString
 ```
 
 這只表示 backend process 有拿到 Application Insights connection string，不代表外部 request 一定已經進入 Azure Monitor。要確認實際 telemetry，可以到 Azure Portal 的 Application Insights resource 查看 requests、failures 或 live metrics。
+
+KQL 查詢範本放在：
+
+```text
+infra/azure/queries
+```
+
+Alert rules 預設不建立。先看 dry run：
+
+```powershell
+.\infra\azure\provision-dev.ps1 -PlanOnly -EnableAlertRules
+```
+
+真的建立：
+
+```powershell
+.\infra\azure\provision-dev.ps1 -EnableAlertRules
+```
+
+目前 alert rules 不綁定 action group，所以會建立規則但不會寄信。
 
 ## Important notes
 

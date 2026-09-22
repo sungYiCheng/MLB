@@ -1,0 +1,4 @@
+AppRequests
+| where TimeGenerated > ago(1h)
+| where Name == "GET /health"
+| summarize Count=count(), LastSeen=max(TimeGenerated), AvgDurationMs=avg(DurationMs)

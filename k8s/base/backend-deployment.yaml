@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlb-ai-api
+  namespace: mlb-ai-go
+  labels:
+    app.kubernetes.io/name: mlb-ai-api
+    app.kubernetes.io/part-of: mlb-ai-go
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mlb-ai-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mlb-ai-api
+        app.kubernetes.io/part-of: mlb-ai-go
+    spec:
+      containers:
+        - name: mlb-ai-api
+          image: acrmlbaigo.azurecr.io/mlb-ai-api:dev-latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: mlb-ai-api-config
+            - secretRef:
+                name: mlb-ai-api-secrets
+                optional: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 512Mi

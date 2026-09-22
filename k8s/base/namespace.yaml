@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlb-ai-go
+  labels:
+    app.kubernetes.io/name: mlb-ai-go
+    app.kubernetes.io/part-of: mlb-ai-go

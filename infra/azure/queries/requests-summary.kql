@@ -1,0 +1,4 @@
+AppRequests
+| where TimeGenerated > ago(1h)
+| summarize Count=count(), AvgDurationMs=avg(DurationMs) by Name, Success
+| order by Count desc

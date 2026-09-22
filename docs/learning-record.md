@@ -1,6 +1,6 @@
 # MLB AI Daily 練習紀錄
 
-最後更新：2026-09-21
+最後更新：2026-09-22
 
 ## 目標
 
@@ -35,6 +35,7 @@
 +-- azure-pipelines-backend.yml
 +-- azure-pipelines-frontend.yml
 +-- infra/
++-- k8s/
 +-- docs/
 +-- PROJECT_CONTEXT.md
 +-- README.md
@@ -185,6 +186,57 @@ application-insights
 ```
 
 用來確認目前 backend process 是否已經拿到 Application Insights connection string。
+
+觀測操作筆記放在：
+
+```text
+docs/observability.md
+```
+
+常用 KQL 查詢範本放在：
+
+```text
+infra/azure/queries
+```
+
+目前 infra script 也有 Azure Monitor alert rule 骨架，但預設不建立。可以先用：
+
+```powershell
+.\infra\azure\provision-dev.ps1 -PlanOnly -EnableAlertRules
+```
+
+看它會建立哪些 alert rules。
+
+## Kubernetes / AKS 準備
+
+目前已先建立 AKS 前的 Kubernetes manifest 雛形：
+
+```text
+k8s/base/
+  namespace.yaml
+  backend-configmap.yaml
+  backend-secret.example.yaml
+  backend-deployment.yaml
+  backend-service.yaml
+  backend-ingress.yaml
+  kustomization.yaml
+```
+
+這一層先不真的建立 AKS，而是練習把 Container Apps 的設定拆成 Kubernetes resources：
+
+| Container Apps | Kubernetes |
+| --- | --- |
+| Container App | Deployment |
+| Environment variables | ConfigMap / Secret |
+| External ingress | Service + Ingress |
+| `/health` smoke test | readinessProbe / livenessProbe |
+| Container App revision | Deployment rollout revision |
+
+詳細筆記放在：
+
+```text
+docs/kubernetes-aks-prep.md
+```
 
 ## Azure Infra Provisioning
 
@@ -373,6 +425,7 @@ azure  -> Azure DevOps
 - 後端部署到 Azure Container Apps，不先使用 VM 或 AKS。
 - Azure dev 資源先用 Azure CLI + PowerShell 腳本整理，之後可再轉成 Bicep 或 Terraform。
 - 後端接 Application Insights，開始練習部署後觀測。
+- 先建立 Kubernetes manifest 雛形，讓 Container Apps 的設定能對應到 AKS 概念。
 - AKS 保留成後續進階練習。
 
 ## 目前下一步
@@ -381,12 +434,18 @@ azure  -> Azure DevOps
 2. 將 `azure-pipelines-infra.yml` push 到 Azure DevOps 後，建立手動觸發的 infra pipeline。
 3. 第一次在 Azure DevOps 跑 infra pipeline 時保持 `planOnly=true`。
 4. 確認 dry run 沒問題後，再手動改成 `planOnly=false` 建立或更新 dev 資源。
-5. 下一個強化方向可以是先實際跑 infra/backend pipeline，確認 Application Insights 收到 telemetry，或再往 AKS 前進。
+5. 下一個強化方向可以是建立 AKS cluster、安裝 ingress controller，或先把 Kubernetes manifests 接進 pipeline。
 
 更細的 Azure DevOps CI/CD 操作筆記放在：
 
 ```text
 docs/azure-devops-cicd.md
+```
+
+目前 Azure 實際狀態與 Ingress 概念整理放在：
+
+```text
+docs/azure-current-state.md
 ```
 
 設定管理與 CORS 筆記放在：

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlb-ai-api
+  namespace: mlb-ai-go
+  labels:
+    app.kubernetes.io/name: mlb-ai-api
+    app.kubernetes.io/part-of: mlb-ai-go
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mlb-ai-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

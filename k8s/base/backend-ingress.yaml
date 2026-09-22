@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mlb-ai-api
+  namespace: mlb-ai-go
+  labels:
+    app.kubernetes.io/name: mlb-ai-api
+    app.kubernetes.io/part-of: mlb-ai-go
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.mlb-ai-go.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mlb-ai-api
+                port:
+                  name: http

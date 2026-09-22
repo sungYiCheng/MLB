@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlb-ai-api-config
+  namespace: mlb-ai-go
+  labels:
+    app.kubernetes.io/name: mlb-ai-api
+    app.kubernetes.io/part-of: mlb-ai-go
+data:
+  ASPNETCORE_ENVIRONMENT: "Development"
+  Cors__AllowedOrigins__0: "https://yellow-forest-04081e300.5.azurestaticapps.net"
