@@ -16,6 +16,7 @@ Practice notes, architecture diagrams, Azure deployment records, and current nex
 - [docs/configuration-management.md](docs/configuration-management.md)
 - [docs/observability.md](docs/observability.md)
 - [docs/kubernetes-aks-prep.md](docs/kubernetes-aks-prep.md)
+- [docs/aks-lab-runbook.md](docs/aks-lab-runbook.md)
 - [infra/azure/README.md](infra/azure/README.md)
 
 ## Current Status
@@ -77,6 +78,7 @@ azure-pipelines.yml           # disabled index file
 azure-pipelines-infra.yml     # manual infra provisioning pipeline
 azure-pipelines-backend.yml   # backend build/image/deploy/smoke test
 azure-pipelines-frontend.yml  # frontend build/deploy/smoke test
+azure-pipelines-aks-lab.yml   # disposable AKS lab lifecycle pipeline
 ```
 
 The current Azure dev resources are documented as reusable provisioning scripts under:
@@ -89,7 +91,10 @@ AKS preparation manifests are under:
 
 ```text
 k8s/base
+k8s/overlays/ingress
 ```
+
+The disposable AKS learning environment is managed under `infra/aks-lab`. It provides no-cost Plan and Preflight checks, builds images in ACR, and performs Create, Deploy, Stop, Start, Status, and guarded Destroy operations without requiring local Docker Desktop.
 
 The backend pipeline uses these deployment variables in `azure-pipelines-backend.yml`:
 
@@ -180,4 +185,4 @@ The response includes game id, official game date, UTC game time, teams, status,
 2. Push split pipeline YAML files to Azure DevOps.
 3. Run the backend and frontend pipelines.
 4. Add stricter deployment gates.
-5. Move the same image flow to AKS when ready.
+5. Create the AKS Lab pipeline from `azure-pipelines-aks-lab.yml` and run Plan before provisioning.

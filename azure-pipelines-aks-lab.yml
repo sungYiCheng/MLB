@@ -1,0 +1,110 @@
+trigger: none
+pr: none
+
+parameters:
+  - name: operation
+    displayName: AKS lab operation
+    type: string
+    default: Plan
+    values:
+      - Plan
+      - Preflight
+      - Create
+      - Deploy
+      - Stop
+      - Start
+      - Status
+      - Destroy
+
+  - name: buildImage
+    displayName: Build a new API image in ACR before Deploy
+    type: boolean
+    default: true
+
+  - name: imageTag
+    displayName: Existing image tag when Build image is disabled
+    type: string
+    default: dev-latest
+
+  - name: includeIngress
+    displayName: Install NGINX Ingress and a public LoadBalancer Service
+    type: boolean
+    default: false
+
+  - name: confirmDestroy
+    displayName: Confirm deletion of rg-mlb-ai-go-aks-lab
+    type: boolean
+    default: false
+
+variables:
+  azureServiceConnection: 'sc-mlb-ai-go-azure'
+  acrName: 'acrmlbaigo'
+  imageRepository: 'mlb-ai-api'
+  dockerfilePath: 'backend/Dockerfile'
+  buildContext: 'backend'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: ManageAksLab
+    displayName: ${{ parameters.operation }} AKS lab
+    jobs:
+      - job: Manage
+        displayName: Run ${{ parameters.operation }} workflow
+        timeoutInMinutes: 60
+        steps:
+          - checkout: self
+
+          - task: KubectlInstaller@0
+            displayName: Install kubectl
+            inputs:
+              kubectlVersion: 'latest'
+            condition: or(eq('${{ parameters.operation }}', 'Deploy'), eq('${{ parameters.operation }}', 'Preflight'))
+
+          - task: HelmInstaller@1
+            displayName: Install Helm
+            inputs:
+              helmVersionToInstall: 'latest'
+            condition: and(eq('${{ parameters.operation }}', 'Deploy'), eq('${{ parameters.includeIngress }}', 'true'))
+
+          - task: AzureCLI@2
+            displayName: Run AKS lab operation
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: pscore
+              scriptLocation: inlineScript
+              inlineScript: |
+                $operation = '${{ parameters.operation }}'
+                $imageTag = '${{ parameters.imageTag }}'
+
+                if ($operation -eq 'Deploy' -and '${{ parameters.buildImage }}' -eq 'true') {
+                  $imageTag = 'aks-lab-$(Build.BuildId)'
+                  Write-Host "Building $(imageRepository):$imageTag in Azure Container Registry"
+
+                  az acr build `
+                    --registry '$(acrName)' `
+                    --image "$(imageRepository):$imageTag" `
+                    --file '$(dockerfilePath)' `
+                    '$(buildContext)'
+
+                  if ($LASTEXITCODE -ne 0) {
+                    throw 'ACR cloud build failed.'
+                  }
+                }
+
+                $scriptArguments = @{
+                  Operation = $operation
+                  ImageTag = $imageTag
+                  BuildId = '$(Build.BuildId)'
+                }
+
+                if ('${{ parameters.includeIngress }}' -eq 'true') {
+                  $scriptArguments.IncludeIngress = $true
+                }
+
+                if ('${{ parameters.confirmDestroy }}' -eq 'true') {
+                  $scriptArguments.ConfirmDestroy = $true
+                }
+
+                ./infra/aks-lab/manage-aks-lab.ps1 @scriptArguments

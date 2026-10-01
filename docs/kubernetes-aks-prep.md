@@ -75,10 +75,10 @@ k8s/base/backend-service.yaml
 在 cluster 內建立穩定入口。Service 會把 port 80 轉到 backend container 的 8080。
 
 ```text
-k8s/base/backend-ingress.yaml
+k8s/overlays/ingress/backend-ingress.yaml
 ```
 
-描述外部 HTTP request 要怎麼進到 service。目前 host 是 placeholder：
+描述外部 HTTP request 要怎麼進到 service。Ingress 已從低成本的 base 拆成選配 overlay，目前 host 是 placeholder：
 
 ```text
 api.mlb-ai-go.local
@@ -113,13 +113,25 @@ GET /health
 
 這跟 CI/CD 的 smoke test 類似，但 probes 是 Kubernetes 在 runtime 持續做的健康判斷。
 
+## AKS Lab Automation
+
+目前已新增可拋棄的 AKS Lab 自動化：
+
+```text
+azure-pipelines-aks-lab.yml
+infra/aks-lab/manage-aks-lab.ps1
+infra/aks-lab/variables.ps1
+```
+
+詳細的每日操作流程請看 [AKS Lab Runbook](./aks-lab-runbook.md)。
+
 ## Before Real AKS Deployment
 
 真的部署前還需要：
 
 1. 建立 AKS cluster。
 2. 讓 AKS 有權限拉 ACR image。
-3. 安裝 ingress controller。
+3. 需要練習外部流量時才安裝 ingress controller。
 4. 決定 domain / DNS。
 5. 建立真實 Secret。
 6. 把 image tag 從 `dev-latest` 改成 commit SHA 或 pipeline build tag。

@@ -10,3 +10,4 @@
 - [設定管理筆記](./configuration-management.md)：local/dev/prod 設定方式、CORS allowed origins、Container Apps env vars 與未來 AKS ConfigMap/Secret 對應。
 - [觀測筆記](./observability.md)：Application Insights、Log Analytics、KQL 查詢範本與 Azure Monitor alert rule 規劃。
 - [Kubernetes / AKS 準備筆記](./kubernetes-aks-prep.md)：Container Apps 到 AKS 的概念對應、Deployment、Service、Ingress、ConfigMap、Secret 與 probes。
+- [AKS Lab 操作手冊](./aks-lab-runbook.md)：純 Azure、無本機 Docker 的 Create、Deploy、Stop、Start、Status 與 Destroy 流程。
