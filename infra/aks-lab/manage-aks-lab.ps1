@@ -25,6 +25,8 @@ $subscription = $AksLabConfig.SubscriptionId
 $location = $AksLabConfig.Location
 $resourceGroupName = $AksLabConfig.ResourceGroupName
 $clusterName = $AksLabConfig.ClusterName
+$controlPlaneIdentityName = $AksLabConfig.ControlPlaneIdentityName
+$kubeletIdentityName = $AksLabConfig.KubeletIdentityName
 $nodeVmSize = $AksLabConfig.NodeVmSize
 $nodeCount = [string]$AksLabConfig.NodeCount
 $nodeOsDiskSizeGb = [string]$AksLabConfig.NodeOsDiskSizeGb
@@ -127,12 +129,15 @@ switch ($Operation) {
     'Plan' {
         Write-Host 'AKS lab plan (no Azure resources will be changed)'
         Write-Host "Lab resource group : $resourceGroupName"
+        Write-Host 'Node resource group: AKS-managed; created and deleted with the cluster'
         Write-Host "AKS cluster        : $clusterName"
         Write-Host "Region             : $location"
         Write-Host "AKS tier           : Free"
         Write-Host "Node pool          : $nodeCount x $nodeVmSize"
         Write-Host "OS disk            : $nodeOsDiskSizeGb GiB managed disk"
         Write-Host "Shared ACR         : $sharedResourceGroupName/$acrName"
+        Write-Host "Control identity   : $controlPlaneIdentityName"
+        Write-Host "Kubelet identity   : $kubeletIdentityName"
         Write-Host "Image              : $acrName.azurecr.io/${imageRepository}:$ImageTag"
         Write-Host "Ingress requested  : $([bool]$IncludeIngress)"
         Write-Host 'The existing dev resource group will not be deleted by this workflow.'
@@ -141,7 +146,7 @@ switch ($Operation) {
 
     'Preflight' {
         if ($resourceGroupName -eq $sharedResourceGroupName) {
-            throw 'The disposable AKS resource group must be different from the shared dev resource group.'
+            throw 'The AKS bootstrap resource group must be different from the shared dev resource group.'
         }
 
         $accountSummary = Invoke-AzCli -Arguments @(
@@ -199,12 +204,28 @@ switch ($Operation) {
             Write-Host $quotaSummary
         }
 
-        $labExists = Invoke-AzCli -Arguments @(
-            'group', 'exists',
-            '--name', $resourceGroupName
+        $groupSummary = Invoke-AzCli -Arguments @(
+            'group', 'show',
+            '--name', $resourceGroupName,
+            '--query', '{name:name,location:location,provisioningState:properties.provisioningState}',
+            '--output', 'table'
         ) -CaptureOutput
-        Write-Host "Lab resource group : exists=$labExists"
-        Write-Host "Destroy boundary   : $resourceGroupName only; shared group is $sharedResourceGroupName"
+        Write-Host 'Bootstrap resource group:'
+        Write-Host $groupSummary
+
+        foreach ($identityName in @($controlPlaneIdentityName, $kubeletIdentityName)) {
+            $identitySummary = Invoke-AzCli -Arguments @(
+                'identity', 'show',
+                '--resource-group', $resourceGroupName,
+                '--name', $identityName,
+                '--query', '{name:name,clientId:clientId}',
+                '--output', 'table'
+            ) -CaptureOutput
+            Write-Host 'Bootstrap managed identity:'
+            Write-Host $identitySummary
+        }
+
+        Write-Host "Destroy boundary   : AKS cluster $clusterName; bootstrap group and identities remain"
 
         Invoke-Kubectl -Arguments @('kustomize', $baseManifestPath)
         Invoke-Kubectl -Arguments @('kustomize', $ingressManifestPath)
@@ -214,15 +235,18 @@ switch ($Operation) {
     }
 
     'Create' {
-        foreach ($providerNamespace in @('Microsoft.Compute', 'Microsoft.ContainerService', 'Microsoft.Network')) {
-            Invoke-AzCli -Arguments @('provider', 'register', '--namespace', $providerNamespace, '--wait')
-        }
-        Invoke-AzCli -Arguments @('group', 'create', '--name', $resourceGroupName, '--location', $location)
+        $controlPlaneIdentityId = Invoke-AzCli -Arguments @(
+            'identity', 'show',
+            '--resource-group', $resourceGroupName,
+            '--name', $controlPlaneIdentityName,
+            '--query', 'id',
+            '--output', 'tsv'
+        ) -CaptureOutput
 
-        $acrId = Invoke-AzCli -Arguments @(
-            'acr', 'show',
-            '--resource-group', $sharedResourceGroupName,
-            '--name', $acrName,
+        $kubeletIdentityId = Invoke-AzCli -Arguments @(
+            'identity', 'show',
+            '--resource-group', $resourceGroupName,
+            '--name', $kubeletIdentityName,
             '--query', 'id',
             '--output', 'tsv'
         ) -CaptureOutput
@@ -248,10 +272,10 @@ switch ($Operation) {
                 '--network-plugin-mode', 'overlay',
                 '--load-balancer-sku', 'standard',
                 '--outbound-type', 'loadBalancer',
-                '--enable-managed-identity',
+                '--assign-identity', $controlPlaneIdentityId,
+                '--assign-kubelet-identity', $kubeletIdentityId,
                 '--enable-oidc-issuer',
                 '--enable-workload-identity',
-                '--attach-acr', $acrId,
                 '--generate-ssh-keys'
             )
         }
@@ -415,15 +439,14 @@ switch ($Operation) {
 
     'Destroy' {
         if (-not $ConfirmDestroy) {
-            throw 'Destroy requires -ConfirmDestroy. This protects the lab resource group from accidental deletion.'
+            throw 'Destroy requires -ConfirmDestroy. This protects the AKS cluster from accidental deletion.'
         }
 
         if (-not (Test-AzResourceExists -Arguments @('group', 'show', '--name', $resourceGroupName))) {
-            Write-Host "AKS lab resource group is already absent: $resourceGroupName"
+            Write-Host "AKS bootstrap resource group is absent: $resourceGroupName. Nothing can be destroyed."
             break
         }
 
-        $nodeResourceGroup = ''
         if (Test-AzResourceExists -Arguments @(
             'aks', 'show',
             '--resource-group', $resourceGroupName,
@@ -436,18 +459,20 @@ switch ($Operation) {
                 '--query', 'nodeResourceGroup',
                 '--output', 'tsv'
             ) -CaptureOutput
+            Write-Host "Deleting disposable AKS cluster and its billable resources: $clusterName"
+            Invoke-AzCli -Arguments @(
+                'aks', 'delete',
+                '--resource-group', $resourceGroupName,
+                '--name', $clusterName,
+                '--yes'
+            )
+            Write-Host "AKS also deletes its managed node resource group: $nodeResourceGroup"
+        } else {
+            Write-Host "AKS lab cluster is already absent: $clusterName"
         }
 
-        Write-Host "Deleting disposable AKS lab resource group: $resourceGroupName"
-        Invoke-AzCli -Arguments @('group', 'delete', '--name', $resourceGroupName, '--yes')
-
-        if (-not [string]::IsNullOrWhiteSpace($nodeResourceGroup) -and
-            (Test-AzResourceExists -Arguments @('group', 'show', '--name', $nodeResourceGroup))) {
-            Write-Host "Deleting remaining AKS node resource group: $nodeResourceGroup"
-            Invoke-AzCli -Arguments @('group', 'delete', '--name', $nodeResourceGroup, '--yes')
-        }
-
-        Write-Host 'AKS lab was destroyed. The shared dev resource group was not changed.'
+        Write-Host 'AKS lab compute was destroyed. The free bootstrap group, identities, and RBAC assignments were preserved.'
+        Write-Host 'The shared dev resource group was not changed.'
         break
     }
 }

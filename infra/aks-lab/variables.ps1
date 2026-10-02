@@ -4,6 +4,8 @@ $AksLabConfig = @{
 
     ResourceGroupName = 'rg-mlb-ai-go-aks-lab'
     ClusterName = 'aks-mlb-ai-go-lab'
+    ControlPlaneIdentityName = 'id-mlb-ai-go-aks-control'
+    KubeletIdentityName = 'id-mlb-ai-go-aks-kubelet'
     NodeVmSize = 'Standard_B2s'
     NodeCount = 1
     NodeOsDiskSizeGb = 32
@@ -12,6 +14,7 @@ $AksLabConfig = @{
     AcrName = 'acrmlbaigo'
     ImageRepository = 'mlb-ai-api'
     ApplicationInsightsName = 'appi-mlb-ai-api-dev'
+    AzureDevOpsServicePrincipalId = 'ce79afe0-6b1d-40ac-a412-ef7bb341b011'
 
     KubernetesNamespace = 'mlb-ai-go'
     KubernetesDeploymentName = 'mlb-ai-api'

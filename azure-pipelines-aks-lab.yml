@@ -32,7 +32,7 @@ parameters:
     default: false
 
   - name: confirmDestroy
-    displayName: Confirm deletion of rg-mlb-ai-go-aks-lab
+    displayName: Confirm deletion of the AKS cluster and billable resources
     type: boolean
     default: false
 
