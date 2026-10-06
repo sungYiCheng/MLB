@@ -6,28 +6,34 @@
 
 最後更新：2026-10-06
 
-目前已完成 AKS 正式建立前的準備與雲端驗證：
+目前已完成 AKS 建立前準備、雲端驗證與第一次成功建立：
 
 - 建立手動操作的 Azure DevOps Pipeline `MLB_AI_GO-AKS-Lab`。
 - 完成 `Plan`，確認預計使用的 AKS、節點、網路與共用資源設定。
 - 建立 Lab Resource Group 與兩個 User Assigned Managed Identities。
 - 完成 Azure Resource Provider、ACR、VM SKU、vCPU quota、RBAC 與 Kubernetes manifests 檢查。
 - Azure DevOps 雲端 `Preflight` 已成功。
-- AKS 自動化程式已同步到 GitHub、Azure DevOps 與本機的 commit `71dcf1b`。
 - 2026-10-06 的第一次 `Create` run `#24` 因 `Standard_B2s` 不被此訂閱的 East Asia AKS 接受而失敗。
-- 本機已改用 `Standard_D2_v4`、加入實際 quota gate，並完成新版 local Preflight；修正尚待人工檢視、commit、push 與雲端重跑。
+- 修正為 `Standard_D2_v4` 並加入實際 quota gate，commit `9871956` 已同步到 GitHub 與 Azure DevOps。
+- 修正後的雲端 Preflight run `#26` 成功。
+- AKS Create run `#27` 成功。
 
-目前**尚未執行 `Create`**，因此 Azure 上還沒有 AKS cluster、VM、VM Scale Set、Managed Disk 或應用程式用的 Load Balancer。
+目前 AKS 已開始產生 node VM、managed disk 與網路資源費用。Cluster 尚未部署 MLB API，也尚未安裝 application-facing Ingress。
 
-目前 Lab Resource Group 內只有：
+目前主要結構為：
 
 ```text
 rg-mlb-ai-go-aks-lab
   id-mlb-ai-go-aks-control
   id-mlb-ai-go-aks-kubelet
+  aks-mlb-ai-go-lab
+
+MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia
+  aks-nodepool1-10369250-vmss
+  VNet / NSG / managed network resources
 ```
 
-這個階段可以理解為施工前確認身分、權限、額度與設計圖都準備好，但還沒有正式建立叢集。
+Cluster 狀態為 `Succeeded / Running`，system node pool 是 `1 x Standard_D2_v4`、32 GiB OS disk；Kubernetes node 已是 `Ready`。
 
 ## What Was Implemented
 
@@ -248,7 +254,7 @@ Preflight 同時補上真正的 quota gate：它現在會計算 `node count x �
 - Lab RG 仍只有兩個 managed identities。
 - 沒有留下 VM、disk、Load Balancer 或 `MC_*` node Resource Group。
 
-## Final Verification
+## Pre-Create Verification (2026-10-02)
 
 本次完成時確認：
 
@@ -262,6 +268,20 @@ Preflight 同時補上真正的 quota gate：它現在會計算 `node count x �
 - 沒有執行 Pipeline 的 `Create`。
 
 因此當下沒有 AKS node VM、disk、application ingress 或其他 AKS workload 正在運行。
+
+## Create Verification (2026-10-06)
+
+修正 SKU 後確認：
+
+- GitHub、Azure DevOps 與 Pipeline 都使用 commit `9871956`。
+- 雲端 Preflight run `#26` 成功。
+- Create run `#27` 成功。
+- Cluster `aks-mlb-ai-go-lab` 為 `Succeeded / Running`。
+- Kubernetes 版本為 `1.35`。
+- Node pool `nodepool1` 為 system mode、`1 x Standard_D2_v4`、32 GiB OS disk。
+- Node `aks-nodepool1-10369250-vmss000000` 為 `Ready`。
+- AKS 自動建立 `MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia`。
+- 尚未執行 `Deploy`，所以還沒有 MLB API Deployment、Service 或 application-facing Ingress。
 
 ## Review Checklist
 

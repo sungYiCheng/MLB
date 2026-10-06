@@ -238,7 +238,7 @@ k8s/base/
 docs/kubernetes-aks-prep.md
 ```
 
-## AKS Lab 建立前準備進度
+## AKS Lab 建立進度
 
 目前已新增獨立、手動觸發的 AKS Lab Pipeline：
 
@@ -252,7 +252,7 @@ Pipeline 支援：
 Plan -> Preflight -> Create -> Deploy -> Stop / Start -> Status -> Destroy
 ```
 
-目前只完成並執行到 `Plan` 與 `Preflight`，尚未執行 `Create`。因此 AKS、node VM、disk 與應用程式 Load Balancer 都還沒有建立。
+2026-10-06 已完成 `Plan`、`Preflight` 與 `Create`。AKS cluster 與 system node 已建立並開始計費，但尚未執行應用程式 `Deploy` 或安裝 application-facing Ingress。
 
 已建立並保留的免費前置資源：
 
@@ -261,6 +261,19 @@ rg-mlb-ai-go-aks-lab
   id-mlb-ai-go-aks-control
   id-mlb-ai-go-aks-kubelet
 ```
+
+已建立的 AKS 資源：
+
+```text
+aks-mlb-ai-go-lab
+  Kubernetes 1.35
+  nodepool1: 1 x Standard_D2_v4, 32 GiB OS disk
+
+MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia
+  VM Scale Set / VNet / NSG / managed network resources
+```
+
+Create run `#27` 成功，cluster 為 `Succeeded / Running`，Kubernetes node 為 `Ready`。
 
 已完成的權限：
 
@@ -474,13 +487,11 @@ azure  -> Azure DevOps
 
 ## 目前下一步
 
-1. 在準備開始計費練習時，手動執行 AKS Lab Pipeline 的 `Create`。
-2. 確認 AKS 自動建立的 `MC_*` node Resource Group、VM Scale Set、disk 與 network resources。
-3. 執行 `Deploy`，由 ACR Tasks 建置 image 並部署 Deployment、Service、ConfigMap、Secret 與 probes。
-4. 先保持 `includeIngress=false`，使用 cluster 內部 smoke test 驗證 API。
-5. 需要學習公開流量時，再使用 `includeIngress=true` 安裝 NGINX Ingress Controller。
-6. 練習 `kubectl get`、`describe`、`logs`、`rollout`、Pod 刪除重建與 scale。
-7. 當天結束時執行 `Destroy`，確認 AKS managed node Resource Group 被刪除，並保留 bootstrap identities 與共用 dev 資源。
+1. 執行 `Deploy`，由 ACR Tasks 建置 image 並部署 Deployment、Service、ConfigMap、Secret 與 probes。
+2. 先保持 `includeIngress=false`，使用 cluster 內部 smoke test 驗證 API。
+3. 練習 `kubectl get`、`describe`、`logs`、`rollout`、Pod 刪除重建與 scale。
+4. 需要學習公開流量時，再使用 `includeIngress=true` 安裝 NGINX Ingress Controller。
+5. 當天結束時執行 `Destroy`，確認 AKS managed node Resource Group 被刪除，並保留 bootstrap identities 與共用 dev 資源。
 
 更細的 Azure DevOps CI/CD 操作筆記放在：
 
