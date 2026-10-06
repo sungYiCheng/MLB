@@ -6,7 +6,8 @@ $AksLabConfig = @{
     ClusterName = 'aks-mlb-ai-go-lab'
     ControlPlaneIdentityName = 'id-mlb-ai-go-aks-control'
     KubeletIdentityName = 'id-mlb-ai-go-aks-kubelet'
-    NodeVmSize = 'Standard_B2s'
+    NodeVmSize = 'Standard_D2_v4'
+    NodeVmQuotaFamily = 'standardDv4Family'
     NodeCount = 1
     NodeOsDiskSizeGb = 32
 

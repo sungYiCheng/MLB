@@ -28,6 +28,7 @@ $clusterName = $AksLabConfig.ClusterName
 $controlPlaneIdentityName = $AksLabConfig.ControlPlaneIdentityName
 $kubeletIdentityName = $AksLabConfig.KubeletIdentityName
 $nodeVmSize = $AksLabConfig.NodeVmSize
+$nodeVmQuotaFamily = $AksLabConfig.NodeVmQuotaFamily
 $nodeCount = [string]$AksLabConfig.NodeCount
 $nodeOsDiskSizeGb = [string]$AksLabConfig.NodeOsDiskSizeGb
 $sharedResourceGroupName = $AksLabConfig.SharedResourceGroupName
@@ -191,10 +192,45 @@ switch ($Operation) {
         }
         Write-Host "Node VM size       : $skuName is listed in $location"
 
+        $nodeVmCores = Invoke-AzCli -Arguments @(
+            'vm', 'list-sizes',
+            '--location', $location,
+            '--query', "[?name=='$nodeVmSize'] | [0].numberOfCores",
+            '--output', 'tsv'
+        ) -CaptureOutput
+        if ([string]::IsNullOrWhiteSpace($nodeVmCores)) {
+            throw "Could not determine the vCPU count for $nodeVmSize in $location."
+        }
+
+        $requiredVcpus = [int]$nodeVmCores * [int]$nodeCount
+        foreach ($quotaName in @('cores', $nodeVmQuotaFamily)) {
+            $quotaCurrent = Invoke-AzCli -Arguments @(
+                'vm', 'list-usage',
+                '--location', $location,
+                '--query', "[?name.value=='$quotaName'] | [0].currentValue",
+                '--output', 'tsv'
+            ) -CaptureOutput
+            $quotaLimit = Invoke-AzCli -Arguments @(
+                'vm', 'list-usage',
+                '--location', $location,
+                '--query', "[?name.value=='$quotaName'] | [0].limit",
+                '--output', 'tsv'
+            ) -CaptureOutput
+
+            if ([string]::IsNullOrWhiteSpace($quotaCurrent) -or [string]::IsNullOrWhiteSpace($quotaLimit)) {
+                throw "Compute quota row was not returned for $quotaName in $location."
+            }
+
+            $remainingVcpus = [int]$quotaLimit - [int]$quotaCurrent
+            if ($remainingVcpus -lt $requiredVcpus) {
+                throw "Insufficient $quotaName quota in $location. Required: $requiredVcpus vCPU; remaining: $remainingVcpus vCPU."
+            }
+        }
+
         $quotaSummary = Invoke-AzCli -Arguments @(
             'vm', 'list-usage',
             '--location', $location,
-            '--query', "[?name.value=='cores' || name.value=='standardBSFamily'].{quota:name.localizedValue,current:currentValue,limit:limit}",
+            '--query', "[?name.value=='cores' || name.value=='$nodeVmQuotaFamily'].{quota:name.localizedValue,current:currentValue,limit:limit}",
             '--output', 'table'
         ) -CaptureOutput
         Write-Host 'Relevant compute quota:'
@@ -203,6 +239,7 @@ switch ($Operation) {
         } else {
             Write-Host $quotaSummary
         }
+        Write-Host "Required node quota: $requiredVcpus vCPU for $nodeCount x $nodeVmSize"
 
         $groupSummary = Invoke-AzCli -Arguments @(
             'group', 'show',

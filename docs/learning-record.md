@@ -1,6 +1,6 @@
 # MLB AI Daily 練習紀錄
 
-最後更新：2026-09-22
+最後更新：2026-10-06
 
 ## 目標
 
@@ -238,6 +238,50 @@ k8s/base/
 docs/kubernetes-aks-prep.md
 ```
 
+## AKS Lab 建立前準備進度
+
+目前已新增獨立、手動觸發的 AKS Lab Pipeline：
+
+```text
+azure-pipelines-aks-lab.yml
+```
+
+Pipeline 支援：
+
+```text
+Plan -> Preflight -> Create -> Deploy -> Stop / Start -> Status -> Destroy
+```
+
+目前只完成並執行到 `Plan` 與 `Preflight`，尚未執行 `Create`。因此 AKS、node VM、disk 與應用程式 Load Balancer 都還沒有建立。
+
+已建立並保留的免費前置資源：
+
+```text
+rg-mlb-ai-go-aks-lab
+  id-mlb-ai-go-aks-control
+  id-mlb-ai-go-aks-kubelet
+```
+
+已完成的權限：
+
+- Azure DevOps Service Principal 對 Lab RG 有最小範圍 `Contributor`。
+- Control plane identity 對 kubelet identity 有 `Managed Identity Operator`。
+- Kubelet identity 對共用 ACR 有 `AcrPull`。
+
+Preflight 包含 Azure providers、ACR、node VM SKU、East Asia regional/family vCPU quota、Resource Group、identities，以及 base/ingress Kustomize manifests。最初規劃的 `Standard_B2s` 在正式 Create 時被此訂閱的 East Asia AKS policy 拒絕，因此後續改用 allowed list 內、且 Dv4-family quota 為 `0/10` 的 `Standard_D2_v4`。
+
+這次最重要的故障排除經驗：
+
+- 個人帳號能看見 Azure 資源，不代表 Azure DevOps Service Principal 也有權限。
+- AKS managed node Resource Group 必須讓 AKS 自動建立，不能先建立同名 Resource Group。
+- 本機與 Pipeline 使用不同 identity，所以兩邊都要驗證。
+
+完整操作、架構、RBAC 關係與錯誤排除請看：
+
+```text
+docs/aks-lab-runbook.md
+```
+
 ## Azure Infra Provisioning
 
 目前已開始把 Azure dev 資源整理成可重跑的基礎設施腳本：
@@ -430,11 +474,13 @@ azure  -> Azure DevOps
 
 ## 目前下一步
 
-1. 先審閱 `infra/azure/provision-dev.ps1 -PlanOnly` 的輸出，確認每個 Azure 資源建立步驟都看得懂。
-2. 將 `azure-pipelines-infra.yml` push 到 Azure DevOps 後，建立手動觸發的 infra pipeline。
-3. 第一次在 Azure DevOps 跑 infra pipeline 時保持 `planOnly=true`。
-4. 確認 dry run 沒問題後，再手動改成 `planOnly=false` 建立或更新 dev 資源。
-5. 下一個強化方向可以是建立 AKS cluster、安裝 ingress controller，或先把 Kubernetes manifests 接進 pipeline。
+1. 在準備開始計費練習時，手動執行 AKS Lab Pipeline 的 `Create`。
+2. 確認 AKS 自動建立的 `MC_*` node Resource Group、VM Scale Set、disk 與 network resources。
+3. 執行 `Deploy`，由 ACR Tasks 建置 image 並部署 Deployment、Service、ConfigMap、Secret 與 probes。
+4. 先保持 `includeIngress=false`，使用 cluster 內部 smoke test 驗證 API。
+5. 需要學習公開流量時，再使用 `includeIngress=true` 安裝 NGINX Ingress Controller。
+6. 練習 `kubectl get`、`describe`、`logs`、`rollout`、Pod 刪除重建與 scale。
+7. 當天結束時執行 `Destroy`，確認 AKS managed node Resource Group 被刪除，並保留 bootstrap identities 與共用 dev 資源。
 
 更細的 Azure DevOps CI/CD 操作筆記放在：
 
