@@ -40,7 +40,7 @@ AKS Lab
           -> Application Insights
 ```
 
-AKS backend 已透過 Managed Gateway API、sslip.io、Let’s Encrypt 與 cert-manager 提供 `https://20-24-106-104.sslip.io`。Frontend production 設定已改為這個 AKS endpoint，等待 frontend pipeline 完成後，公開網站就會直接呼叫 AKS Pod。原本的 Container Apps backend 暫時保留，作為比較與回復路徑。
+AKS backend 已透過 Managed Gateway API、sslip.io、Let’s Encrypt 與 cert-manager 提供 `https://20-24-106-104.sslip.io`。Frontend production 已部署這個 AKS endpoint，公開網站現在會直接經 Gateway 與 Service 呼叫 AKS Pod。原本的 Container Apps backend 暫時保留，作為比較與回復路徑。
 
 ## Azure Resource Group
 
@@ -243,6 +243,7 @@ Plan -> Preflight -> Create -> Deploy -> Stop / Start -> Status -> Destroy
 - Create run `#27` 成功。
 - Gateway Deploy run `#30` 成功。
 - Free HTTPS Deploy run `#31` 成功。
+- Frontend automatic CI run `#32` 與重複驗證 run `#33` 成功。
 - Image 為 `acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-30`。
 - Cluster 內部 `/health` smoke test 成功。
 

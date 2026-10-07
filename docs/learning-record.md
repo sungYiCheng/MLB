@@ -517,6 +517,7 @@ azure  -> Azure DevOps
 7. 建立 Gateway 與 HTTPRoute，並從外部通過 `http://20.24.106.104/health` 取得 HTTP 200。
 8. 使用 sslip.io、Let’s Encrypt 與 cert-manager 建立免費 HTTPS，Pipeline run `#31` 驗證 Certificate `Ready=True` 且公開 `/health` 回傳 HTTP 200。
 9. 將 frontend production API URL 改為 `https://20-24-106-104.sslip.io`，讓 Static Web Apps 經 Gateway 與 Service 呼叫 AKS Pod。
+10. Frontend automatic CI run `#32` 與手動重複驗證 run `#33` 都成功；公開 bundle、API、CORS 與 E2E 均已驗證。
 
 下一階段可加入 Gateway access logs、API HPA 與 NetworkPolicy。當天結束時應執行 `Stop` 或 `Destroy`，因為現在有兩個 node 與公開 Load Balancer。
 

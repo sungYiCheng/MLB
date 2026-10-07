@@ -124,3 +124,15 @@ HTTPS /health:                 HTTP 200
 ```
 
 外部健康檢查回傳 `version=aks-lab-30`、`buildId=31`、`imageTag=aks-lab-30`，證明 HTTPS request 經 Gateway、Service 到達 AKS Pod。
+
+Frontend commit `47ce9e1` 觸發自動 CI run `#32`，另以手動 run `#33` 重複驗證；兩次的 unit test、build、Static Web Apps deploy、smoke test 與 Playwright E2E 均成功。
+
+部署後的獨立端到端檢查：
+
+```text
+Static Web Apps:                   HTTP 200
+Production bundle uses AKS URL:   true
+Production bundle uses old URL:   false
+AKS /api/games/today:             HTTP 200
+Access-Control-Allow-Origin:       https://yellow-forest-04081e300.5.azurestaticapps.net
+```
