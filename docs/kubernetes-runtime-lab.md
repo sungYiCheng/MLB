@@ -1,6 +1,6 @@
 # Kubernetes Runtime Lab Notes
 
-最後更新：2026-10-06
+最後更新：2026-10-07
 
 這份筆記整理 MLB AI GO 實際部署到 AKS 後的架構、Kubernetes 核心觀念、部署流程與第一次 self-healing 實驗。
 
@@ -10,28 +10,32 @@
 
 - AKS cluster `aks-mlb-ai-go-lab` 建立成功。
 - Kubernetes 版本為 `1.35.8`。
-- System node pool 為 `1 x Standard_D2_v4`，OS disk 32 GiB。
+- System node pool 為 `2 x Standard_D2_v4`，OS disk 各 32 GiB。
 - Azure DevOps AKS Lab Pipeline run `#28` 部署成功。
 - Backend image 為 `acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-28`。
 - Namespace、Deployment、ReplicaSet、Pod、Service、ConfigMap 與 Secret 都已建立。
 - Readiness probe、liveness probe 與 cluster 內部 smoke test 已通過。
 - 手動刪除 Pod 後，ReplicaSet 已自動建立替代 Pod，self-healing 驗證成功。
-- Ingress 尚未啟用，因此 AKS API 沒有 application-facing public endpoint。
+- Scale、Rolling Update、Rollback 與 Readiness failure 實驗已完成。
+- Managed Gateway API 已啟用，`http://20.24.106.104/health` 可從 cluster 外部存取。
 
 目前實際資源：
 
 ```text
 Cluster: aks-mlb-ai-go-lab
-Node:    aks-nodepool1-10369250-vmss000000
+Nodes:   aks-nodepool1-10369250-vmss000000, vmss000001
 
 Namespace: mlb-ai-go
   Deployment: mlb-ai-api                  1/1 available
   ReplicaSet: mlb-ai-api-869dfc6cd5       1 desired / 1 ready
-  Pod:        mlb-ai-api-869dfc6cd5-s5rw4 1/1 Running
+  Pod:        mlb-ai-api                   1/1 Running
   Service:    mlb-ai-api                  ClusterIP 10.0.105.212:80
   Endpoint:   10.244.0.112:8080
   ConfigMap:  mlb-ai-api-config
   Secret:     mlb-ai-api-secrets
+  Gateway:    mlb-ai-api-gateway           Programmed=True
+  HTTPRoute:  mlb-ai-api                   Accepted=True
+  Public IP:  20.24.106.104
 ```
 
 ## Four Architecture Layers
@@ -111,7 +115,7 @@ flowchart TB
     end
 
     subgraph NodeResourceGroup[AKS-managed MC Resource Group]
-        VMSS[VM Scale Set<br/>1 x Standard_D2_v4]
+        VMSS[VM Scale Set<br/>2 x Standard_D2_v4]
         Network[VNet / NSG / Managed Networking]
         Disk[32 GiB OS Disk]
     end
@@ -361,39 +365,36 @@ sequenceDiagram
     Node-->>Pipeline: HTTP success
 ```
 
-## Network State Before Ingress
+## Current Gateway Network State
 
-目前 Service type 是 `ClusterIP`：
+應用 Service 仍然是 `ClusterIP`，但已由 Managed Gateway 提供對外入口：
 
 ```text
-EXTERNAL-IP: <none>
+Gateway Public IP: 20.24.106.104
 ```
 
-因此：
+因此流量路徑為：
 
-- Cluster 內部 Pod 可以呼叫 `http://mlb-ai-api`。
-- Pipeline 可以建立一次性 Pod 做 smoke test。
-- 使用者瀏覽器不能直接呼叫 AKS API。
-- Static Web Apps 仍呼叫 Container Apps backend。
-- 還沒有 NGINX Ingress Controller 或 application public IP。
+```text
+Internet -> Public IP -> Azure Load Balancer -> Gateway proxy
+         -> HTTPRoute -> ClusterIP Service -> Ready Pod:8080
+```
 
-臨時測試可使用 `kubectl port-forward`，不需建立永久公開入口。
+Static Web Apps 目前仍呼叫 Container Apps backend，尚未切換到 AKS。
 
-## Future Ingress Architecture
-
-啟用 Ingress 後，預計流量會變成：
+## Gateway API Architecture
 
 ```mermaid
 flowchart LR
     Browser[Browser] --> PublicIP[Azure Public IP]
     PublicIP --> LoadBalancer[LoadBalancer Service]
-    LoadBalancer --> Nginx[NGINX Ingress Controller]
-    Nginx --> Ingress[Ingress rule]
-    Ingress --> Service[ClusterIP Service<br/>mlb-ai-api:80]
+    LoadBalancer --> Proxy[Managed Gateway proxy]
+    Proxy --> Route[HTTPRoute<br/>PathPrefix /]
+    Route --> Service[ClusterIP Service<br/>mlb-ai-api:80]
     Service --> Pod[Ready Pod<br/>:8080]
 ```
 
-Ingress resource 只是路由規則；真正接收外部流量的是 Ingress Controller。安裝 NGINX Controller 後，Azure 會為它的 `LoadBalancer` Service 配置 public frontend。
+Gateway 定義 listener，HTTPRoute 定義路由，AKS 管理的 Gateway proxy 真正處理外部流量。完整啟用、排程問題與驗證過程請看 `docs/gateway-api-lab.md`。
 
 ## Useful Commands
 

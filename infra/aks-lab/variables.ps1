@@ -8,7 +8,7 @@ $AksLabConfig = @{
     KubeletIdentityName = 'id-mlb-ai-go-aks-kubelet'
     NodeVmSize = 'Standard_D2_v4'
     NodeVmQuotaFamily = 'standardDv4Family'
-    NodeCount = 1
+    NodeCount = 2
     NodeOsDiskSizeGb = 32
 
     SharedResourceGroupName = 'rg-mlb-ai-go-dev'
@@ -20,5 +20,6 @@ $AksLabConfig = @{
     KubernetesNamespace = 'mlb-ai-go'
     KubernetesDeploymentName = 'mlb-ai-api'
     KubernetesServiceName = 'mlb-ai-api'
+    KubernetesGatewayName = 'mlb-ai-api-gateway'
     FrontendOrigin = 'https://yellow-forest-04081e300.5.azurestaticapps.net'
 }

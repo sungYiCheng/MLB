@@ -267,7 +267,7 @@ rg-mlb-ai-go-aks-lab
 ```text
 aks-mlb-ai-go-lab
   Kubernetes 1.35
-  nodepool1: 1 x Standard_D2_v4, 32 GiB OS disk
+  nodepool1: 2 x Standard_D2_v4, 32 GiB OS disk each
 
 MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia
   VM Scale Set / VNet / NSG / managed network resources
@@ -506,12 +506,17 @@ azure  -> Azure DevOps
 
 ## 目前下一步
 
-1. 將 Deployment 從 1 個 Pod scale 到 2，再縮回 1，觀察 Service endpoints。
-2. 練習 Rolling Update，觀察新舊 ReplicaSet 與 Pod 逐步替換。
-3. 練習 `kubectl rollout history` 與 rollback。
-4. 練習 readiness/liveness failure 對 Service 與 Container restart 的影響。
-5. 需要學習公開流量時，再使用 `includeIngress=true` 安裝 NGINX Ingress Controller。
-6. 當天結束時執行 `Destroy`，確認 AKS managed node Resource Group 被刪除，並保留 bootstrap identities 與共用 dev 資源。
+2026-10-07 已完成：
+
+1. Deployment 在 1 與 2 replicas 之間擴縮，並觀察 Service EndpointSlice。
+2. 使用環境變數觸發 Rolling Update，觀察新舊 ReplicaSet 替換。
+3. 使用 `kubectl rollout undo` 回復到 `aks-lab-28`。
+4. 故意將 readiness path 改錯，驗證壞 Pod 不會進入 Service 流量，且舊 Pod 會留下繼續服務。
+5. 啟用 AKS Managed Gateway API 與 Application Routing Istio。
+6. 因第二個 `istiod` 出現 `Insufficient cpu`，將 node pool 從 1 擴成 2。
+7. 建立 Gateway 與 HTTPRoute，並從外部通過 `http://20.24.106.104/health` 取得 HTTP 200。
+
+下一階段可加入 DNS/TLS、切換前端 API URL、Gateway access logs 與 API HPA。當天結束時應執行 `Stop` 或 `Destroy`，因為現在有兩個 node 與公開 Load Balancer。
 
 更細的 Azure DevOps CI/CD 操作筆記放在：
 

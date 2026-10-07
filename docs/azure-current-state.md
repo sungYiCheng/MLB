@@ -38,7 +38,7 @@ AKS Lab
           -> Application Insights
 ```
 
-目前正式 frontend 仍呼叫 Container Apps backend。AKS 已建立並部署同一套 backend，但目前只有 ClusterIP，尚未透過 Ingress 對外公開，因此是獨立的 Kubernetes 練習環境。
+目前正式 frontend 仍呼叫 Container Apps backend。AKS 已建立並部署同一套 backend，並已透過 Managed Gateway API 對外公開 `http://20.24.106.104`；前端尚未切換到這個 Lab endpoint。
 
 ## Azure Resource Group
 
@@ -250,8 +250,8 @@ Plan -> Preflight -> Create -> Deploy -> Stop / Start -> Status -> Destroy
 ```text
 aks-mlb-ai-go-lab
   Kubernetes 1.35.8
-  nodepool1: 1 x Standard_D2_v4
-  node: Ready
+  nodepool1: 2 x Standard_D2_v4
+  nodes: 2 x Ready
 ```
 
 目前應用程式：
@@ -265,6 +265,9 @@ Service:    ClusterIP 10.0.105.212:80
 Endpoint:   10.244.0.112:8080
 ConfigMap:  mlb-ai-api-config
 Secret:     mlb-ai-api-secrets
+Gateway:    mlb-ai-api-gateway Programmed=True
+HTTPRoute:  mlb-ai-api Accepted=True / ResolvedRefs=True
+Public URL: http://20.24.106.104/health
 ```
 
 Deployment 使用 RollingUpdate，resource settings 為：
@@ -362,13 +365,13 @@ Service
 Deployment / Pod
 ```
 
-啟用 Ingress 後，流量會變成：
+啟用 Gateway API 後，流量變成：
 
 ```text
 Browser
   -> Public IP / Load Balancer
-      -> Ingress Controller
-          -> Ingress rule
+      -> Managed Gateway proxy
+          -> HTTPRoute
               -> Service
                   -> Pod
 ```
@@ -378,10 +381,11 @@ Browser
 ```text
 k8s/base/backend-service.yaml
 k8s/base/backend-deployment.yaml
-k8s/overlays/ingress/backend-ingress.yaml
+k8s/overlays/gateway/backend-gateway.yaml
+k8s/overlays/gateway/backend-http-route.yaml
 ```
 
-目前 base 已部署，Ingress overlay 尚未套用。也就是 Deployment、Pod 與 ClusterIP Service 已運作，但還沒有 application-facing public endpoint。
+目前 base 與 Gateway overlay 都已部署。Deployment、Pod 與 ClusterIP Service 負責應用執行；Gateway、HTTPRoute、LoadBalancer Service 與 Public IP 負責對外流量。
 
 ## Container Apps vs AKS
 
@@ -389,8 +393,8 @@ k8s/overlays/ingress/backend-ingress.yaml
 | --- | --- |
 | Container App | Deployment |
 | Revision | ReplicaSet / rollout revision |
-| External ingress | Ingress Controller + Ingress |
-| Built-in public URL | Public IP / DNS / Ingress host |
+| External ingress | Gateway + HTTPRoute |
+| Built-in public URL | Public IP / DNS / Gateway listener |
 | Env vars | ConfigMap / Secret |
 | Scale settings | replicas / HPA |
 | Health check | readinessProbe / livenessProbe |
@@ -399,11 +403,9 @@ k8s/overlays/ingress/backend-ingress.yaml
 
 目前基礎 AKS 與 backend runtime 已完成。以下是刻意留到下一階段的項目，不是故障：
 
-- 安裝 NGINX Ingress Controller
-- 建立 application-facing LoadBalancer/Public IP
 - 設定正式 DNS 與 TLS certificate
 - 修改 frontend production API URL 指向 AKS
-- 啟用 HPA 自動擴縮
+- 啟用 MLB API workload 的 HPA 自動擴縮（Gateway proxy 已有 managed HPA）
 - 啟用 Container Insights / Managed Prometheus
 - 將 Kubernetes Secret 進一步改成 Azure Key Vault + Workload Identity
 - 加入 production 等級的 Entra/Kubernetes RBAC 與 network policy
@@ -412,16 +414,12 @@ k8s/overlays/ingress/backend-ingress.yaml
 
 ## Suggested Next Step
 
-下一步建議先做不增加 Azure 基礎設施的 Kubernetes runtime 練習：
+已完成 Kubernetes runtime 練習：
 
 ```text
-Scale -> Rolling Update -> Rollback -> Probe failure experiment
+Scale -> Rolling Update -> Rollback -> Readiness failure -> Gateway API
 ```
 
 依序學習：
 
-- 將 replicas 從 1 調成 2，觀察 Pod 與 Service endpoints，再縮回 1。
-- 建立新版 image，觀察 RollingUpdate 如何替換 ReplicaSet 與 Pod。
-- 使用 rollout history 與 rollback 回到上一版。
-- 模擬 readiness/liveness failure，觀察移除流量與 Container restart 的差異。
-- 上述概念穩定後，再啟用 NGINX Ingress。
+下一階段是 DNS/TLS、前端切換、Gateway access logs 與 API HPA。

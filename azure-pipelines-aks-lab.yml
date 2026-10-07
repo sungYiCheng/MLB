@@ -26,8 +26,8 @@ parameters:
     type: string
     default: dev-latest
 
-  - name: includeIngress
-    displayName: Install NGINX Ingress and a public LoadBalancer Service
+  - name: includeGateway
+    displayName: Publish the API through the managed Gateway API
     type: boolean
     default: false
 
@@ -62,12 +62,6 @@ stages:
               kubectlVersion: 'latest'
             condition: or(eq('${{ parameters.operation }}', 'Deploy'), eq('${{ parameters.operation }}', 'Preflight'))
 
-          - task: HelmInstaller@1
-            displayName: Install Helm
-            inputs:
-              helmVersionToInstall: 'latest'
-            condition: and(eq('${{ parameters.operation }}', 'Deploy'), eq('${{ parameters.includeIngress }}', 'true'))
-
           - task: AzureCLI@2
             displayName: Run AKS lab operation
             inputs:
@@ -99,8 +93,8 @@ stages:
                   BuildId = '$(Build.BuildId)'
                 }
 
-                if ('${{ parameters.includeIngress }}' -eq 'true') {
-                  $scriptArguments.IncludeIngress = $true
+                if ('${{ parameters.includeGateway }}' -eq 'true') {
+                  $scriptArguments.IncludeGateway = $true
                 }
 
                 if ('${{ parameters.confirmDestroy }}' -eq 'true') {

@@ -4,7 +4,7 @@
 
 ## Current Progress
 
-最後更新：2026-10-06
+最後更新：2026-10-07
 
 目前已完成 AKS 建立前準備、雲端驗證與第一次成功建立：
 
@@ -19,8 +19,12 @@
 - AKS Create run `#27` 成功。
 - AKS Deploy run `#28` 成功，MLB API、ClusterIP Service、ConfigMap、Secret 與 probes 已建立。
 - 手動刪除 MLB API Pod 後，ReplicaSet 成功建立替代 Pod，self-healing 已驗證。
+- Scale、Rolling Update、Rollback 與 Readiness failure 實驗已完成。
+- Managed Gateway API 與 Application Routing Istio 已啟用。
+- Node pool 因 `istiod` CPU Requests 從 1 擴成 2，兩個 `istiod` 均已 Running。
+- `Gateway/mlb-ai-api-gateway` 與 `HTTPRoute/mlb-ai-api` 已部署，公開 `/health` 回傳 HTTP 200。
 
-目前 AKS 已開始產生 node VM、managed disk 與網路資源費用。MLB API 已在 cluster 內運行，但尚未安裝 application-facing Ingress。
+目前 AKS 有兩個 node VM、managed disks、Gateway Load Balancer 與 Public IP，都可能產生費用。MLB API 已透過 `http://20.24.106.104` 對外公開。
 
 目前主要結構為：
 
@@ -35,7 +39,7 @@ MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia
   VNet / NSG / managed network resources
 ```
 
-Cluster 狀態為 `Succeeded / Running`，system node pool 是 `1 x Standard_D2_v4`、32 GiB OS disk；Kubernetes node 已是 `Ready`。
+Cluster 狀態為 `Succeeded / Running`，system node pool 是 `2 x Standard_D2_v4`、每台 32 GiB OS disk；兩個 Kubernetes node 都是 `Ready`。
 
 目前應用程式狀態：
 
@@ -68,7 +72,7 @@ Pipeline 目前提供八種 operation：
 | --- | --- | --- |
 | `Plan` | 顯示預計使用的設定，不連動資源變更 | 否 |
 | `Preflight` | 檢查 Azure、權限、配額與 manifests | 否 |
-| `Create` | 建立 AKS cluster 與一台 node | 是 |
+| `Create` | 建立 AKS cluster、兩台 node 與 Managed Gateway API | 是 |
 | `Deploy` | 建置 image 並部署到既有 AKS | 視既有資源與 ACR build 而定 |
 | `Stop` | 停止 AKS control plane 與 node compute | 降低費用，但部分資源仍可能計費 |
 | `Start` | 啟動已停止的 AKS | 是 |
@@ -87,7 +91,7 @@ AKS Lab 的固定參數放在 `infra/aks-lab/variables.ps1`：
 | Lab Resource Group | `rg-mlb-ai-go-aks-lab` |
 | Cluster | `aks-mlb-ai-go-lab` |
 | Node VM | `Standard_D2_v4` |
-| Node count | `1` |
+| Node count | `2` |
 | OS disk | `32 GiB` |
 | Shared Resource Group | `rg-mlb-ai-go-dev` |
 | Shared ACR | `acrmlbaigo` |
@@ -158,7 +162,7 @@ flowchart LR
 6. Lab RG 與 shared dev RG 不會使用相同名稱。
 7. Lab RG 與兩個 identities 都存在且可讀取。
 8. `k8s/base` 可以用 `kubectl kustomize` 成功渲染。
-9. `k8s/overlays/ingress` 也可以成功渲染。
+9. `k8s/overlays/gateway` 也可以成功渲染。
 
 本次檢查到的主要 quota：
 
@@ -310,7 +314,7 @@ Preflight 同時補上真正的 quota gate：它現在會計算 `node count x �
 - 手動刪除舊 Pod `mlb-ai-api-869dfc6cd5-77k9j` 後，ReplicaSet 自動建立 `mlb-ai-api-869dfc6cd5-s5rw4`。
 - 新 Pod 使用相同 ReplicaSet 與 image，最後回到 `1/1 Running`，self-healing 成功。
 - Service IP 保持不變並改指向新 Pod IP。
-- Ingress 仍未啟用，因此沒有 application-facing public endpoint。
+- Gateway API 已啟用，公開 `/health` endpoint 已從 cluster 外部驗證成功。
 
 ## Review Checklist
 
@@ -411,13 +415,14 @@ Preflight 不建立或修改 AKS 資源。
 建立：
 
 - AKS Free tier cluster `aks-mlb-ai-go-lab`
-- 一台 `Standard_D2_v4` system node
-- 32 GiB managed OS disk
+- 兩台 `Standard_D2_v4` system nodes
+- 每台 32 GiB managed OS disk
 - Azure CNI Overlay 網路
 - OIDC issuer 與 workload identity
+- Managed Gateway API 與 Application Routing Istio
 - 使用預先授權的 kubelet identity 從既有 ACR 拉 image
 
-Create 不會部署應用程式，也不會安裝 NGINX Ingress。
+Create 不會部署應用程式或建立公開 Gateway，但會安裝 Gateway API 控制能力。
 
 ### Deploy
 
@@ -432,14 +437,15 @@ Create 不會部署應用程式，也不會安裝 NGINX Ingress。
 7. 等待 rollout 完成。
 8. 在 cluster 內建立一次性 curl Pod，呼叫 `/health` smoke test。
 
-`includeIngress` 預設為 `false`。因此一般 Deploy 不會替 API 建立公開入口，但 AKS 本身仍可能保留受控的 Standard Load Balancer 與 Public IP，供 cluster outbound traffic 使用。
+`includeGateway` 預設為 `false`。因此一般 Deploy 不會替 API 建立公開入口，但 AKS 本身仍可能保留受控的 Standard Load Balancer 與 Public IP，供 cluster outbound traffic 使用。
 
-需要練習 Ingress 時才把 `includeIngress` 設為 `true`。Pipeline 會額外安裝：
+需要公開 API 時才把 `includeGateway` 設為 `true`。Pipeline 會額外：
 
-- NGINX Ingress Controller
-- 對外的 `LoadBalancer` Service 與 public frontend
-- Ingress 使用的 Public IP
-- `k8s/overlays/ingress` 內的 Ingress resource
+- 套用 `k8s/overlays/gateway`。
+- 建立 `Gateway` 與 `HTTPRoute`。
+- 等待 Gateway `Programmed=True`。
+- 取得 LoadBalancer Public IP。
+- 從 Pipeline agent 執行公開 `/health` smoke test。
 
 ### Stop
 
@@ -470,10 +476,10 @@ Destroy 的順序：
 Plan
   -> Preflight
   -> Create
-  -> Deploy (includeIngress=false)
+  -> Deploy (includeGateway=false)
   -> Kubernetes practice
   -> Stop / Start during long breaks
-  -> Deploy (includeIngress=true) only for the Ingress lesson
+  -> Deploy (includeGateway=true) for the public Gateway lesson
   -> Destroy with confirmDestroy=true at the end of the day
 ```
 

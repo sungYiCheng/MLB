@@ -15,9 +15,10 @@ k8s/
     backend-deployment.yaml
     backend-service.yaml
   overlays/
-    ingress/
+    gateway/
       kustomization.yaml
-      backend-ingress.yaml
+      backend-gateway.yaml
+      backend-http-route.yaml
 ```
 
 ## Current Mapping
@@ -28,7 +29,7 @@ k8s/
 | Container App revision | ReplicaSet / rollout revision |
 | Container image | Deployment container image |
 | Environment variables | ConfigMap / Secret |
-| External ingress | Service + Ingress |
+| External ingress | Service + Gateway + HTTPRoute |
 | Scale min/max replicas | Deployment replicas / HPA |
 | `/health` smoke test | readinessProbe / livenessProbe |
 | ACR image pull | AKS kubelet identity with AcrPull |
@@ -42,10 +43,10 @@ k8s/
 kubectl apply -k k8s/base
 ```
 
-需要練習 Ingress 時才套用 overlay：
+需要練習公開 Gateway 時才套用 overlay：
 
 ```powershell
-kubectl apply -k k8s/overlays/ingress
+kubectl apply -k k8s/overlays/gateway
 ```
 
 目前 `backend-secret.example.yaml` 是範本。真的部署前，不要把真實 connection string commit 進 repo。可以用這種方式建立 secret：
@@ -61,8 +62,8 @@ kubectl create secret generic mlb-ai-api-secrets `
 
 ## Important Notes
 
-- `k8s/base` 不包含 Ingress，避免一般練習一開始就公開 API；AKS 本身仍可能保留受控的 outbound Load Balancer 與 Public IP。
-- `k8s/overlays/ingress/backend-ingress.yaml` 使用 `nginx` ingress class，套用前需要先安裝 NGINX Ingress Controller。
-- `api.mlb-ai-go.local` 是 placeholder host。未來可以換成正式 domain。
+- `k8s/base` 不包含 Gateway，避免一般練習一開始就公開 API；AKS 本身仍可能保留受控的 outbound Load Balancer 與 Public IP。
+- `k8s/overlays/gateway` 使用 AKS 管理的 `approuting-istio` GatewayClass，套用前需啟用 Managed Gateway API 與 Application Routing Istio。
+- 目前 HTTPRoute 沒有限制 hostname，方便學習時直接用 public IP 驗證。正式環境應再加上 DNS 與 TLS。
 - `backend-deployment.yaml` 目前使用 `acrmlbaigo.azurecr.io/mlb-ai-api:dev-latest`。正式部署時更建議改成 commit SHA tag。
 - AKS 要能拉 ACR image，需要讓 AKS kubelet identity 或 managed identity 有 ACR 的 `AcrPull` 權限。

@@ -1,0 +1,20 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mlb-ai-api
+  namespace: mlb-ai-go
+  labels:
+    app.kubernetes.io/name: mlb-ai-api
+    app.kubernetes.io/part-of: mlb-ai-go
+spec:
+  parentRefs:
+    - name: mlb-ai-api-gateway
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: mlb-ai-api
+          port: 80

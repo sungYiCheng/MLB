@@ -91,7 +91,7 @@ AKS preparation manifests are under:
 
 ```text
 k8s/base
-k8s/overlays/ingress
+k8s/overlays/gateway
 ```
 
 The disposable AKS learning environment is managed under `infra/aks-lab`. It provides no-cost Plan and Preflight checks, builds images in ACR, and performs Create, Deploy, Stop, Start, Status, and guarded Destroy operations without requiring local Docker Desktop.
@@ -99,11 +99,13 @@ The disposable AKS learning environment is managed under `infra/aks-lab`. It pro
 Current AKS lab status:
 
 - Cluster `aks-mlb-ai-go-lab` is running in East Asia.
-- The system pool has one `Standard_D2_v4` node.
+- The system pool has two `Standard_D2_v4` nodes so both managed `istiod` replicas can be scheduled.
 - Deploy run `#28` published `mlb-ai-api:aks-lab-28` and deployed it to namespace `mlb-ai-go`.
 - The Deployment, Pod, ClusterIP Service, ConfigMap, Secret, health probes, and internal smoke test are working.
-- The Ingress overlay has not been applied, so the AKS API is not yet public.
+- The managed Gateway API is enabled and the public `/health` endpoint is available at `http://20.24.106.104/health`.
+- `Gateway/mlb-ai-api-gateway` is programmed and `HTTPRoute/mlb-ai-api` is accepted.
 - Runtime architecture and exercises are documented in `docs/kubernetes-runtime-lab.md`.
+- Gateway API setup and troubleshooting are documented in `docs/gateway-api-lab.md`.
 
 The backend pipeline uses these deployment variables in `azure-pipelines-backend.yml`:
 
@@ -190,8 +192,7 @@ The response includes game id, official game date, UTC game time, teams, status,
 
 ## Next Steps
 
-1. Scale the AKS Deployment from one replica to two and back to one.
-2. Practice a rolling update and inspect the old/new ReplicaSets.
-3. Practice rollout history and rollback.
-4. Simulate readiness and liveness failures.
-5. Apply the optional NGINX Ingress overlay only after the internal runtime exercises are understood.
+1. Add DNS and HTTPS/TLS to the AKS Gateway.
+2. Decide when the Azure Static Web Apps frontend should switch from Container Apps to the AKS API.
+3. Add centralized Gateway access-log monitoring.
+4. Add an HPA for the MLB API workload and practice load-based scaling.

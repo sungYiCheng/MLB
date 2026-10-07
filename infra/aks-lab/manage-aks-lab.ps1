@@ -6,7 +6,7 @@ param(
     [string]$SubscriptionId,
     [string]$ImageTag = 'dev-latest',
     [string]$BuildId = 'manual',
-    [switch]$IncludeIngress,
+    [switch]$IncludeGateway,
     [switch]$ConfirmDestroy
 )
 
@@ -38,9 +38,10 @@ $applicationInsightsName = $AksLabConfig.ApplicationInsightsName
 $kubernetesNamespace = $AksLabConfig.KubernetesNamespace
 $kubernetesDeploymentName = $AksLabConfig.KubernetesDeploymentName
 $kubernetesServiceName = $AksLabConfig.KubernetesServiceName
+$kubernetesGatewayName = $AksLabConfig.KubernetesGatewayName
 $frontendOrigin = $AksLabConfig.FrontendOrigin
 $baseManifestPath = Join-Path $repoRoot 'k8s\base'
-$ingressManifestPath = Join-Path $repoRoot 'k8s\overlays\ingress'
+$gatewayManifestPath = Join-Path $repoRoot 'k8s\overlays\gateway'
 
 function Invoke-AzCli {
     param(
@@ -109,19 +110,6 @@ function Invoke-Kubectl {
     }
 }
 
-function Invoke-Helm {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$Arguments
-    )
-
-    Write-Host ('[helm] helm ' + ($Arguments -join ' '))
-    & helm @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "Helm command failed: helm $($Arguments -join ' ')"
-    }
-}
-
 if (-not [string]::IsNullOrWhiteSpace($subscription)) {
     Invoke-AzCli -Arguments @('account', 'set', '--subscription', $subscription)
 }
@@ -140,7 +128,8 @@ switch ($Operation) {
         Write-Host "Control identity   : $controlPlaneIdentityName"
         Write-Host "Kubelet identity   : $kubeletIdentityName"
         Write-Host "Image              : $acrName.azurecr.io/${imageRepository}:$ImageTag"
-        Write-Host "Ingress requested  : $([bool]$IncludeIngress)"
+        Write-Host 'Gateway API        : enabled during cluster creation'
+        Write-Host "Public gateway     : $([bool]$IncludeGateway)"
         Write-Host 'The existing dev resource group will not be deleted by this workflow.'
         break
     }
@@ -149,6 +138,16 @@ switch ($Operation) {
         if ($resourceGroupName -eq $sharedResourceGroupName) {
             throw 'The AKS bootstrap resource group must be different from the shared dev resource group.'
         }
+
+        $azureCliVersionText = Invoke-AzCli -Arguments @(
+            'version',
+            '--query', '"azure-cli"',
+            '--output', 'tsv'
+        ) -CaptureOutput
+        if ([version]$azureCliVersionText -lt [version]'2.86.0') {
+            throw "Azure CLI 2.86.0 or newer is required for the managed Gateway API. Current version: $azureCliVersionText"
+        }
+        Write-Host "Azure CLI version   : $azureCliVersionText"
 
         $accountSummary = Invoke-AzCli -Arguments @(
             'account', 'show',
@@ -265,8 +264,8 @@ switch ($Operation) {
         Write-Host "Destroy boundary   : AKS cluster $clusterName; bootstrap group and identities remain"
 
         Invoke-Kubectl -Arguments @('kustomize', $baseManifestPath)
-        Invoke-Kubectl -Arguments @('kustomize', $ingressManifestPath)
-        Write-Host 'Kustomize          : base and ingress overlay rendered successfully'
+        Invoke-Kubectl -Arguments @('kustomize', $gatewayManifestPath)
+        Write-Host 'Kustomize          : base and Gateway API overlay rendered successfully'
         Write-Host 'Preflight completed without creating or changing AKS resources.'
         break
     }
@@ -313,7 +312,47 @@ switch ($Operation) {
                 '--assign-kubelet-identity', $kubeletIdentityId,
                 '--enable-oidc-issuer',
                 '--enable-workload-identity',
+                '--enable-gateway-api',
+                '--enable-app-routing-istio',
                 '--generate-ssh-keys'
+            )
+        }
+
+        $gatewayApiMode = Invoke-AzCli -Arguments @(
+            'aks', 'show',
+            '--resource-group', $resourceGroupName,
+            '--name', $clusterName,
+            '--query', 'ingressProfile.webAppRouting.gatewayApiImplementations.appRoutingIstio.mode',
+            '--output', 'tsv'
+        ) -CaptureOutput
+
+        if ($gatewayApiMode -ne 'Enabled') {
+            Invoke-AzCli -Arguments @(
+                'aks', 'update',
+                '--resource-group', $resourceGroupName,
+                '--name', $clusterName,
+                '--enable-gateway-api',
+                '--enable-app-routing-istio'
+            )
+        }
+
+        $currentNodeCount = Invoke-AzCli -Arguments @(
+            'aks', 'nodepool', 'show',
+            '--resource-group', $resourceGroupName,
+            '--cluster-name', $clusterName,
+            '--name', 'nodepool1',
+            '--query', 'count',
+            '--output', 'tsv'
+        ) -CaptureOutput
+
+        if ([int]$currentNodeCount -ne [int]$nodeCount) {
+            Write-Host "Reconciling nodepool1 from $currentNodeCount to $nodeCount nodes."
+            Invoke-AzCli -Arguments @(
+                'aks', 'scale',
+                '--resource-group', $resourceGroupName,
+                '--name', $clusterName,
+                '--nodepool-name', 'nodepool1',
+                '--node-count', $nodeCount
             )
         }
 
@@ -413,27 +452,57 @@ switch ($Operation) {
             "curl --fail --retry 10 --retry-delay 5 http://${kubernetesServiceName}/health"
         )
 
-        if ($IncludeIngress) {
-            Invoke-Helm -Arguments @('repo', 'add', 'ingress-nginx', 'https://kubernetes.github.io/ingress-nginx')
-            Invoke-Helm -Arguments @('repo', 'update')
-            Invoke-Helm -Arguments @(
-                'upgrade', '--install', 'ingress-nginx', 'ingress-nginx/ingress-nginx',
-                '--namespace', 'ingress-nginx',
-                '--create-namespace',
-                '--wait',
-                '--timeout', '10m'
+        if ($IncludeGateway) {
+            $gatewayClassAccepted = Invoke-Kubectl -Arguments @(
+                'get', 'gatewayclass', 'approuting-istio',
+                '--output', 'jsonpath={.status.conditions[?(@.type=="Accepted")].status}'
             )
-            Invoke-Kubectl -Arguments @('apply', '-k', $ingressManifestPath)
+            if ($gatewayClassAccepted -ne 'True') {
+                throw 'The approuting-istio GatewayClass is not accepted.'
+            }
 
+            Invoke-Kubectl -Arguments @('apply', '-k', $gatewayManifestPath)
             Invoke-Kubectl -Arguments @(
-                'get', 'service', 'ingress-nginx-controller',
-                '--namespace', 'ingress-nginx',
-                '--output', 'wide'
+                'wait', '--for=condition=programmed',
+                "gateway/$kubernetesGatewayName",
+                '--namespace', $kubernetesNamespace,
+                '--timeout=10m'
             )
-            Write-Host 'Ingress is enabled. Azure may need several minutes to assign the external IP.'
-            Write-Host 'Test with the Host header api.mlb-ai-go.local after EXTERNAL-IP is assigned.'
+
+            $gatewayAddress = Invoke-Kubectl -Arguments @(
+                'get', 'gateway', $kubernetesGatewayName,
+                '--namespace', $kubernetesNamespace,
+                '--output', 'jsonpath={.status.addresses[0].value}'
+            )
+            if ([string]::IsNullOrWhiteSpace($gatewayAddress)) {
+                throw 'The Gateway is programmed but no public address was returned.'
+            }
+
+            $healthUrl = "http://$gatewayAddress/health"
+            Write-Host "Gateway address     : $gatewayAddress"
+            Write-Host "Gateway health URL  : $healthUrl"
+
+            $gatewayHealthy = $false
+            for ($attempt = 1; $attempt -le 20; $attempt++) {
+                try {
+                    $response = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 15
+                    if ($response.StatusCode -eq 200) {
+                        $gatewayHealthy = $true
+                        break
+                    }
+                } catch {
+                    Write-Host "Gateway smoke test attempt $attempt/20 is not ready yet: $($_.Exception.Message)"
+                }
+                Start-Sleep -Seconds 15
+            }
+
+            if (-not $gatewayHealthy) {
+                throw "Gateway smoke test failed: $healthUrl"
+            }
+
+            Invoke-Kubectl -Arguments @('get', 'gateway,httproute', '--namespace', $kubernetesNamespace, '--output', 'wide')
         } else {
-            Write-Host 'Ingress was not installed, so the API has no application-facing public endpoint.'
+            Write-Host 'The public Gateway was not applied, so the API has no application-facing public endpoint.'
             Write-Host 'AKS can still retain its managed Standard Load Balancer for cluster outbound traffic.'
         }
 

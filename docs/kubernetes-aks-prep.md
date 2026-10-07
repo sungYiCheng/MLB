@@ -12,7 +12,7 @@
 Deployment -> 管 Pod 怎麼跑、跑幾份、用哪個 image
 Pod        -> 真正跑 container 的最小單位
 Service    -> 在 cluster 裡給 Pod 一個穩定入口
-Ingress    -> 讓外部 HTTP/HTTPS 流量進到 Service
+Gateway + HTTPRoute -> 讓外部 HTTP/HTTPS 流量進到 Service
 ConfigMap  -> 非敏感設定
 Secret     -> connection string、token 這類敏感設定
 Probe      -> Kubernetes 判斷 container 是否 ready / alive
@@ -26,7 +26,7 @@ Probe      -> Kubernetes 判斷 container 是否 ready / alive
 | Container image | `spec.template.spec.containers[].image` |
 | `Cors__AllowedOrigins__0` | `ConfigMap/mlb-ai-api-config` |
 | `ApplicationInsights__ConnectionString` | `Secret/mlb-ai-api-secrets` |
-| External ingress | `Service` + `Ingress` |
+| External ingress | `Service` + `Gateway` + `HTTPRoute` |
 | `/health` pipeline smoke test | `readinessProbe` + `livenessProbe` |
 | Container App revision | Deployment rollout revision |
 
@@ -75,13 +75,14 @@ k8s/base/backend-service.yaml
 在 cluster 內建立穩定入口。Service 會把 port 80 轉到 backend container 的 8080。
 
 ```text
-k8s/overlays/ingress/backend-ingress.yaml
+k8s/overlays/gateway/backend-gateway.yaml
+k8s/overlays/gateway/backend-http-route.yaml
 ```
 
-描述外部 HTTP request 要怎麼進到 service。Ingress 已從低成本的 base 拆成選配 overlay，目前 host 是 placeholder：
+描述外部 HTTP request 如何通過 AKS Managed Gateway API 進入 service。Gateway overlay 與低成本的 base 分開，目前不限定 hostname，方便直接用 Public IP 驗證。
 
 ```text
-api.mlb-ai-go.local
+http://20.24.106.104/health
 ```
 
 ## Why Service Is Needed
@@ -94,7 +95,7 @@ Service 提供穩定名稱：
 mlb-ai-api.mlb-ai-go.svc.cluster.local
 ```
 
-Ingress 再把外部流量導到這個 Service。
+Gateway 與 HTTPRoute 再把外部流量導到這個 Service。
 
 ## Why Probes Matter
 
@@ -127,21 +128,22 @@ infra/aks-lab/variables.ps1
 
 ## Current AKS Deployment Status
 
-2026-10-06 已完成：
+2026-10-07 已完成：
 
-1. 建立 AKS cluster 與一個 `Standard_D2_v4` system node。
+1. 建立 AKS cluster，並為 Gateway API 擴充為兩個 `Standard_D2_v4` system node。
 2. Kubelet identity 已有 ACR `AcrPull`，image 拉取成功。
 3. Deploy run `#28` 建置並部署 `mlb-ai-api:aks-lab-28`。
 4. Namespace、Deployment、ReplicaSet、Pod、ClusterIP Service、ConfigMap 與 Secret 已建立。
 5. Readiness、liveness 與 cluster 內部 smoke test 已通過。
 6. 手動刪除 Pod 後，ReplicaSet 自動建立替代 Pod，self-healing 已驗證。
+7. Scale、Rolling Update、Rollback 與 Readiness failure 實驗已完成。
+8. Managed Gateway API、Gateway、HTTPRoute、LoadBalancer/Public IP 與外部 `/health` smoke test 已完成。
 
 尚未執行的進階項目：
 
-1. 安裝 ingress controller 與建立 application public endpoint。
-2. 決定 domain、DNS 與 TLS certificate。
-3. 將 frontend API URL 切換到 AKS。
-4. 啟用 HPA 與完整 Azure Monitor / Container Insights。
+1. 決定 domain、DNS 與 TLS certificate。
+2. 將 frontend API URL 切換到 AKS。
+3. 啟用 API HPA 與完整 Azure Monitor / Container Insights。
 5. 將 Kubernetes Secret 升級為 Azure Key Vault + Workload Identity。
 
 詳細 runtime 架構與操作請看 [Kubernetes Runtime Lab Notes](./kubernetes-runtime-lab.md)。
