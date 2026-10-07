@@ -17,8 +17,10 @@
 - 修正為 `Standard_D2_v4` 並加入實際 quota gate，commit `9871956` 已同步到 GitHub 與 Azure DevOps。
 - 修正後的雲端 Preflight run `#26` 成功。
 - AKS Create run `#27` 成功。
+- AKS Deploy run `#28` 成功，MLB API、ClusterIP Service、ConfigMap、Secret 與 probes 已建立。
+- 手動刪除 MLB API Pod 後，ReplicaSet 成功建立替代 Pod，self-healing 已驗證。
 
-目前 AKS 已開始產生 node VM、managed disk 與網路資源費用。Cluster 尚未部署 MLB API，也尚未安裝 application-facing Ingress。
+目前 AKS 已開始產生 node VM、managed disk 與網路資源費用。MLB API 已在 cluster 內運行，但尚未安裝 application-facing Ingress。
 
 目前主要結構為：
 
@@ -34,6 +36,19 @@ MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia
 ```
 
 Cluster 狀態為 `Succeeded / Running`，system node pool 是 `1 x Standard_D2_v4`、32 GiB OS disk；Kubernetes node 已是 `Ready`。
+
+目前應用程式狀態：
+
+```text
+Namespace:  mlb-ai-go
+Deployment: mlb-ai-api 1/1 available
+Pod:        mlb-ai-api-869dfc6cd5-s5rw4 1/1 Running
+Image:      acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-28
+Service:    ClusterIP 10.0.105.212:80
+Endpoint:   10.244.0.112:8080
+```
+
+詳細 Kubernetes runtime 架構與 self-healing 筆記請看 [Kubernetes Runtime Lab Notes](./kubernetes-runtime-lab.md)。
 
 ## What Was Implemented
 
@@ -281,7 +296,21 @@ Preflight 同時補上真正的 quota gate：它現在會計算 `node count x �
 - Node pool `nodepool1` 為 system mode、`1 x Standard_D2_v4`、32 GiB OS disk。
 - Node `aks-nodepool1-10369250-vmss000000` 為 `Ready`。
 - AKS 自動建立 `MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia`。
-- 尚未執行 `Deploy`，所以還沒有 MLB API Deployment、Service 或 application-facing Ingress。
+- 驗證當下尚未執行 `Deploy`；後續 Deploy run `#28` 已成功。
+
+## Deploy And Self-Healing Verification (2026-10-06)
+
+- Deploy run `#28` 成功。
+- ACR image `mlb-ai-api:aks-lab-28` 拉取成功，證明 kubelet identity 的 `AcrPull` 正常。
+- Deployment `mlb-ai-api` 為 `1/1` available。
+- Pod 為 `1/1 Running`、`RESTARTS=0`。
+- ClusterIP Service `10.0.105.212:80` 指向 Pod endpoint `10.244.0.112:8080`。
+- ConfigMap 與 Application Insights Secret 已建立。
+- Pipeline 內部 `/health` smoke test 成功。
+- 手動刪除舊 Pod `mlb-ai-api-869dfc6cd5-77k9j` 後，ReplicaSet 自動建立 `mlb-ai-api-869dfc6cd5-s5rw4`。
+- 新 Pod 使用相同 ReplicaSet 與 image，最後回到 `1/1 Running`，self-healing 成功。
+- Service IP 保持不變並改指向新 Pod IP。
+- Ingress 仍未啟用，因此沒有 application-facing public endpoint。
 
 ## Review Checklist
 

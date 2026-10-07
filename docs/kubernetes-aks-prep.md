@@ -125,13 +125,23 @@ infra/aks-lab/variables.ps1
 
 詳細的每日操作流程請看 [AKS Lab Runbook](./aks-lab-runbook.md)。
 
-## Before Real AKS Deployment
+## Current AKS Deployment Status
 
-真的部署前還需要：
+2026-10-06 已完成：
 
-1. 建立 AKS cluster。
-2. 讓 AKS 有權限拉 ACR image。
-3. 需要練習外部流量時才安裝 ingress controller。
-4. 決定 domain / DNS。
-5. 建立真實 Secret。
-6. 把 image tag 從 `dev-latest` 改成 commit SHA 或 pipeline build tag。
+1. 建立 AKS cluster 與一個 `Standard_D2_v4` system node。
+2. Kubelet identity 已有 ACR `AcrPull`，image 拉取成功。
+3. Deploy run `#28` 建置並部署 `mlb-ai-api:aks-lab-28`。
+4. Namespace、Deployment、ReplicaSet、Pod、ClusterIP Service、ConfigMap 與 Secret 已建立。
+5. Readiness、liveness 與 cluster 內部 smoke test 已通過。
+6. 手動刪除 Pod 後，ReplicaSet 自動建立替代 Pod，self-healing 已驗證。
+
+尚未執行的進階項目：
+
+1. 安裝 ingress controller 與建立 application public endpoint。
+2. 決定 domain、DNS 與 TLS certificate。
+3. 將 frontend API URL 切換到 AKS。
+4. 啟用 HPA 與完整 Azure Monitor / Container Insights。
+5. 將 Kubernetes Secret 升級為 Azure Key Vault + Workload Identity。
+
+詳細 runtime 架構與操作請看 [Kubernetes Runtime Lab Notes](./kubernetes-runtime-lab.md)。

@@ -2,6 +2,8 @@
 
 這份筆記用 step by step 的方式整理目前 MLB AI Daily 在 Azure 上已經建立與部署的內容，以及 CI/CD 怎麼把程式部署上去。
 
+最後更新：2026-10-07
+
 ## Big Picture
 
 目前架構是：
@@ -17,15 +19,26 @@ GitHub / Azure DevOps Repo
           -> Angular build
           -> Azure Static Web Apps frontend
           -> Smoke + E2E test
+      -> AKS Lab Pipeline
+          -> Plan / Preflight / Create
+          -> ACR build
+          -> Deploy to AKS
+          -> Cluster-internal smoke test
 
 Browser
   -> Azure Static Web Apps
       -> Azure Container Apps backend
           -> MLB Stats API
           -> Application Insights / Log Analytics
+
+AKS Lab
+  -> ClusterIP Service
+      -> MLB API Pod
+          -> MLB Stats API
+          -> Application Insights
 ```
 
-目前還沒有真正建立 AKS。AKS 相關的 `k8s/base` manifests 是下一階段的準備。
+目前正式 frontend 仍呼叫 Container Apps backend。AKS 已建立並部署同一套 backend，但目前只有 ClusterIP，尚未透過 Ingress 對外公開，因此是獨立的 Kubernetes 練習環境。
 
 ## Azure Resource Group
 
@@ -48,6 +61,26 @@ rg-mlb-ai-go-dev
 | Application Insights | `appi-mlb-ai-api-dev` | 看 requests、failures、duration、dependencies |
 | Managed workspace | `workspace-rgmlbaigodev3ZWi` | Container Apps 先前自動建立的 workspace |
 | Smart Detection | `Application Insights Smart Detection` | Application Insights 自動偵測相關資源 |
+
+AKS 練習資源放在另一個 Resource Group：
+
+```text
+rg-mlb-ai-go-aks-lab
+```
+
+| Resource | Name | 用途 |
+| --- | --- | --- |
+| AKS cluster | `aks-mlb-ai-go-lab` | Kubernetes 練習環境 |
+| Control plane identity | `id-mlb-ai-go-aks-control` | AKS control plane 使用的 Azure identity |
+| Kubelet identity | `id-mlb-ai-go-aks-kubelet` | Node 從 ACR 拉取 image |
+
+AKS 自動建立並管理：
+
+```text
+MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia
+```
+
+其中包含 VM Scale Set、VNet、NSG、managed disk 與 AKS 管理的網路資源。
 
 ## Backend Hosting
 
@@ -115,11 +148,12 @@ Static Web Apps 適合目前前端，因為 Angular build 完就是靜態檔，�
 
 ## CI/CD Flow
 
-目前 Azure DevOps 有兩條主要 pipeline：
+目前 Azure DevOps 的主要 pipelines 包含：
 
 ```text
 MLB_AI_GO-Backend-CI
 MLB_AI_GO-Frontend-CI
+MLB_AI_GO-AKS-Lab
 ```
 
 Repo 裡的 YAML：
@@ -128,6 +162,7 @@ Repo 裡的 YAML：
 azure-pipelines-backend.yml
 azure-pipelines-frontend.yml
 azure-pipelines-infra.yml
+azure-pipelines-aks-lab.yml
 ```
 
 ### Backend Pipeline
@@ -191,6 +226,63 @@ AZURE_STATIC_WEB_APPS_API_TOKEN
 ```
 
 這個 token 不會放進 repo。
+
+### AKS Lab Pipeline
+
+AKS Lab Pipeline 是手動觸發，不會因一般 push 自動建立或刪除 cluster：
+
+```text
+Plan -> Preflight -> Create -> Deploy -> Stop / Start -> Status -> Destroy
+```
+
+2026-10-06 執行結果：
+
+- Preflight run `#26` 成功。
+- Create run `#27` 成功。
+- Deploy run `#28` 成功。
+- Image 為 `acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-28`。
+- Cluster 內部 `/health` smoke test 成功。
+
+## AKS Runtime
+
+目前 cluster：
+
+```text
+aks-mlb-ai-go-lab
+  Kubernetes 1.35.8
+  nodepool1: 1 x Standard_D2_v4
+  node: Ready
+```
+
+目前應用程式：
+
+```text
+Namespace:  mlb-ai-go
+Deployment: mlb-ai-api 1/1 available
+Pod:        mlb-ai-api-869dfc6cd5-s5rw4 1/1 Running
+Image:      acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-28
+Service:    ClusterIP 10.0.105.212:80
+Endpoint:   10.244.0.112:8080
+ConfigMap:  mlb-ai-api-config
+Secret:     mlb-ai-api-secrets
+```
+
+Deployment 使用 RollingUpdate，resource settings 為：
+
+```text
+requests: 100m CPU / 128Mi memory
+limits:   250m CPU / 512Mi memory
+```
+
+Readiness 與 liveness 都呼叫 `/health`。Pod 已持續運行約 22 小時、`RESTARTS=0`，Deployment conditions 為 `Available=True` 與 `Progressing=True`。
+
+已完成 self-healing 實驗：手動刪除舊 Pod 後，ReplicaSet 自動建立替代 Pod；Service ClusterIP 保持不變並改指向新 Pod IP。
+
+完整 runtime 架構請看：
+
+```text
+docs/kubernetes-runtime-lab.md
+```
 
 ## Observability
 
@@ -259,7 +351,7 @@ Browser / Frontend
 
 你不需要自己建 Service、Ingress Controller 或 Load Balancer。
 
-### 在未來 AKS 裡
+### 在目前 AKS 裡
 
 AKS 不會像 Container Apps 一樣全部幫你包好。你要自己準備：
 
@@ -270,7 +362,7 @@ Service
 Deployment / Pod
 ```
 
-未來流量會變成：
+啟用 Ingress 後，流量會變成：
 
 ```text
 Browser
@@ -281,15 +373,15 @@ Browser
                   -> Pod
 ```
 
-我們目前在 repo 裡先準備了：
+目前 repo 已準備：
 
 ```text
-k8s/base/backend-ingress.yaml
 k8s/base/backend-service.yaml
 k8s/base/backend-deployment.yaml
+k8s/overlays/ingress/backend-ingress.yaml
 ```
 
-意思是先把 Container Apps 幫你包起來的東西拆開學。
+目前 base 已部署，Ingress overlay 尚未套用。也就是 Deployment、Pod 與 ClusterIP Service 已運作，但還沒有 application-facing public endpoint。
 
 ## Container Apps vs AKS
 
@@ -303,32 +395,33 @@ k8s/base/backend-deployment.yaml
 | Scale settings | replicas / HPA |
 | Health check | readinessProbe / livenessProbe |
 
-## What We Have Not Done Yet
+## Intentionally Deferred Items
 
-目前還沒有：
+目前基礎 AKS 與 backend runtime 已完成。以下是刻意留到下一階段的項目，不是故障：
 
-- 建立 AKS cluster
-- 建立 AKS node pool
 - 安裝 NGINX Ingress Controller
-- 把 backend 真正部署到 AKS
+- 建立 application-facing LoadBalancer/Public IP
+- 設定正式 DNS 與 TLS certificate
 - 修改 frontend production API URL 指向 AKS
-- 把 AKS deploy 接進 backend pipeline
+- 啟用 HPA 自動擴縮
+- 啟用 Container Insights / Managed Prometheus
+- 將 Kubernetes Secret 進一步改成 Azure Key Vault + Workload Identity
+- 加入 production 等級的 Entra/Kubernetes RBAC 與 network policy
 
-這些會是下一階段。
+目前 Container Insights 尚未啟用，所以 Portal 的 Monitoring > Insights 不會有完整 Container logs、CPU 與 memory dashboard。這是為了先控制學習複雜度與 Log Analytics 成本。
 
 ## Suggested Next Step
 
-下一步建議先做：
+下一步建議先做不增加 Azure 基礎設施的 Kubernetes runtime 練習：
 
 ```text
-AKS low-cost infra plan
+Scale -> Rolling Update -> Rollback -> Probe failure experiment
 ```
 
-也就是先決定：
+依序學習：
 
-- AKS cluster name
-- node size
-- node count
-- 是否只測試時 start，用完 stop
-- ingress controller 選 NGINX 或 Application Gateway
-- backend pipeline 要新增 AKS deploy stage，還是先手動部署
+- 將 replicas 從 1 調成 2，觀察 Pod 與 Service endpoints，再縮回 1。
+- 建立新版 image，觀察 RollingUpdate 如何替換 ReplicaSet 與 Pod。
+- 使用 rollout history 與 rollback 回到上一版。
+- 模擬 readiness/liveness failure，觀察移除流量與 Container restart 的差異。
+- 上述概念穩定後，再啟用 NGINX Ingress。

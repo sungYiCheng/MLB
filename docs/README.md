@@ -11,3 +11,4 @@
 - [觀測筆記](./observability.md)：Application Insights、Log Analytics、KQL 查詢範本與 Azure Monitor alert rule 規劃。
 - [Kubernetes / AKS 準備筆記](./kubernetes-aks-prep.md)：Container Apps 到 AKS 的概念對應、Deployment、Service、Ingress、ConfigMap、Secret 與 probes。
 - [AKS Lab 操作手冊與實作紀錄](./aks-lab-runbook.md)：純 Azure、無本機 Docker 的操作流程，以及前置資源、RBAC、Preflight 與故障排除紀錄。
+- [Kubernetes Runtime 實作筆記](./kubernetes-runtime-lab.md)：目前 AKS runtime 架構、部署流程、資源關係、網路、probes、self-healing 與常用指令。

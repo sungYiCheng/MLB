@@ -252,7 +252,7 @@ Pipeline 支援：
 Plan -> Preflight -> Create -> Deploy -> Stop / Start -> Status -> Destroy
 ```
 
-2026-10-06 已完成 `Plan`、`Preflight` 與 `Create`。AKS cluster 與 system node 已建立並開始計費，但尚未執行應用程式 `Deploy` 或安裝 application-facing Ingress。
+2026-10-06 已完成 `Plan`、`Preflight`、`Create` 與 `Deploy`。AKS cluster 與 system node 已建立並開始計費，MLB API 已在 cluster 內運行；application-facing Ingress 尚未安裝。
 
 已建立並保留的免費前置資源：
 
@@ -275,6 +275,19 @@ MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia
 
 Create run `#27` 成功，cluster 為 `Succeeded / Running`，Kubernetes node 為 `Ready`。
 
+Deploy run `#28` 成功，目前 runtime 狀態：
+
+```text
+Namespace:  mlb-ai-go
+Deployment: mlb-ai-api 1/1 available
+Pod:        1/1 Running, restarts 0
+Image:      acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-28
+Service:    ClusterIP 10.0.105.212:80
+Endpoint:   Pod 10.244.0.112:8080
+```
+
+已完成第一次 self-healing 實驗：手動刪除 MLB API Pod 後，ReplicaSet 自動建立替代 Pod；Service IP 不變，並重新指向新 Pod endpoint。
+
 已完成的權限：
 
 - Azure DevOps Service Principal 對 Lab RG 有最小範圍 `Contributor`。
@@ -293,6 +306,12 @@ Preflight 包含 Azure providers、ACR、node VM SKU、East Asia regional/family
 
 ```text
 docs/aks-lab-runbook.md
+```
+
+Kubernetes runtime 架構、資源關係、probes、self-healing 與常用指令請看：
+
+```text
+docs/kubernetes-runtime-lab.md
 ```
 
 ## Azure Infra Provisioning
@@ -487,11 +506,12 @@ azure  -> Azure DevOps
 
 ## 目前下一步
 
-1. 執行 `Deploy`，由 ACR Tasks 建置 image 並部署 Deployment、Service、ConfigMap、Secret 與 probes。
-2. 先保持 `includeIngress=false`，使用 cluster 內部 smoke test 驗證 API。
-3. 練習 `kubectl get`、`describe`、`logs`、`rollout`、Pod 刪除重建與 scale。
-4. 需要學習公開流量時，再使用 `includeIngress=true` 安裝 NGINX Ingress Controller。
-5. 當天結束時執行 `Destroy`，確認 AKS managed node Resource Group 被刪除，並保留 bootstrap identities 與共用 dev 資源。
+1. 將 Deployment 從 1 個 Pod scale 到 2，再縮回 1，觀察 Service endpoints。
+2. 練習 Rolling Update，觀察新舊 ReplicaSet 與 Pod 逐步替換。
+3. 練習 `kubectl rollout history` 與 rollback。
+4. 練習 readiness/liveness failure 對 Service 與 Container restart 的影響。
+5. 需要學習公開流量時，再使用 `includeIngress=true` 安裝 NGINX Ingress Controller。
+6. 當天結束時執行 `Destroy`，確認 AKS managed node Resource Group 被刪除，並保留 bootstrap identities 與共用 dev 資源。
 
 更細的 Azure DevOps CI/CD 操作筆記放在：
 
