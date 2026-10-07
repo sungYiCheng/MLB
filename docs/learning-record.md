@@ -515,8 +515,10 @@ azure  -> Azure DevOps
 5. 啟用 AKS Managed Gateway API 與 Application Routing Istio。
 6. 因第二個 `istiod` 出現 `Insufficient cpu`，將 node pool 從 1 擴成 2。
 7. 建立 Gateway 與 HTTPRoute，並從外部通過 `http://20.24.106.104/health` 取得 HTTP 200。
+8. 使用 sslip.io、Let’s Encrypt 與 cert-manager 建立免費 HTTPS，Pipeline run `#31` 驗證 Certificate `Ready=True` 且公開 `/health` 回傳 HTTP 200。
+9. 將 frontend production API URL 改為 `https://20-24-106-104.sslip.io`，讓 Static Web Apps 經 Gateway 與 Service 呼叫 AKS Pod。
 
-下一階段可加入 DNS/TLS、切換前端 API URL、Gateway access logs 與 API HPA。當天結束時應執行 `Stop` 或 `Destroy`，因為現在有兩個 node 與公開 Load Balancer。
+下一階段可加入 Gateway access logs、API HPA 與 NetworkPolicy。當天結束時應執行 `Stop` 或 `Destroy`，因為現在有兩個 node 與公開 Load Balancer。
 
 更細的 Azure DevOps CI/CD 操作筆記放在：
 

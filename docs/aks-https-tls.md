@@ -108,4 +108,19 @@ HTTPS /health = HTTP 200
 - `sslip.io` 適合 Lab，不適合作為正式產品品牌網域。
 - hostname 寫入目前 Public IP；若 Gateway 或 cluster 重建後 IP 改變，必須更新 YAML 與變數。
 - HTTP port 80 暫時保留給 Let’s Encrypt HTTP-01 challenge。之後可以另加 HTTP-to-HTTPS redirect，但不能阻斷 challenge。
-- 下一階段才會把 Azure Static Web Apps 的 API base URL 從 Container Apps 切換到這個 AKS HTTPS hostname。
+- Frontend production API base URL 已切換到這個 AKS HTTPS hostname；若 AKS Stop 或 Destroy，公開網站的資料載入也會停止。
+
+## Deployment Result
+
+2026-10-07 Azure DevOps AKS Pipeline run `#31` 成功完成：
+
+```text
+ClusterIssuer/letsencrypt-prod: Ready=True
+Certificate/mlb-ai-api-tls:    Ready=True
+CertificateRequest:            Approved=True / Ready=True
+ACME Order:                    valid
+Gateway:                       Programmed=True
+HTTPS /health:                 HTTP 200
+```
+
+外部健康檢查回傳 `version=aks-lab-30`、`buildId=31`、`imageTag=aks-lab-30`，證明 HTTPS request 經 Gateway、Service 到達 AKS Pod。

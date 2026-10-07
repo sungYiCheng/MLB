@@ -23,11 +23,13 @@ GitHub / Azure DevOps Repo
           -> Plan / Preflight / Create
           -> ACR build
           -> Deploy to AKS
-          -> Cluster-internal smoke test
+          -> Internal + public HTTPS smoke tests
 
 Browser
   -> Azure Static Web Apps
-      -> Azure Container Apps backend
+      -> AKS Gateway API over HTTPS
+          -> ClusterIP Service
+          -> MLB API Pod
           -> MLB Stats API
           -> Application Insights / Log Analytics
 
@@ -38,7 +40,7 @@ AKS Lab
           -> Application Insights
 ```
 
-目前正式 frontend 仍呼叫 Container Apps backend。AKS 已建立並部署同一套 backend，並已透過 Managed Gateway API 對外公開 `http://20.24.106.104`；前端尚未切換到這個 Lab endpoint。
+AKS backend 已透過 Managed Gateway API、sslip.io、Let’s Encrypt 與 cert-manager 提供 `https://20-24-106-104.sslip.io`。Frontend production 設定已改為這個 AKS endpoint，等待 frontend pipeline 完成後，公開網站就會直接呼叫 AKS Pod。原本的 Container Apps backend 暫時保留，作為比較與回復路徑。
 
 ## Azure Resource Group
 
@@ -240,6 +242,7 @@ Plan -> Preflight -> Create -> Deploy -> Stop / Start -> Status -> Destroy
 - Preflight run `#26` 成功。
 - Create run `#27` 成功。
 - Gateway Deploy run `#30` 成功。
+- Free HTTPS Deploy run `#31` 成功。
 - Image 為 `acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-30`。
 - Cluster 內部 `/health` smoke test 成功。
 
@@ -267,7 +270,8 @@ ConfigMap:  mlb-ai-api-config
 Secret:     mlb-ai-api-secrets
 Gateway:    mlb-ai-api-gateway Programmed=True
 HTTPRoute:  mlb-ai-api Accepted=True / ResolvedRefs=True
-Public URL: http://20.24.106.104/health
+Public URL: https://20-24-106-104.sslip.io/health
+TLS:        Let's Encrypt Certificate Ready=True
 ```
 
 Deployment 使用 RollingUpdate，resource settings 為：
@@ -403,8 +407,7 @@ k8s/overlays/gateway/backend-http-route.yaml
 
 目前基礎 AKS 與 backend runtime 已完成。以下是刻意留到下一階段的項目，不是故障：
 
-- 設定正式 DNS 與 TLS certificate
-- 修改 frontend production API URL 指向 AKS
+- 購買正式自有網域並取代 Lab 用的 sslip.io（非必要）
 - 啟用 MLB API workload 的 HPA 自動擴縮（Gateway proxy 已有 managed HPA）
 - 啟用 Container Insights / Managed Prometheus
 - 將 Kubernetes Secret 進一步改成 Azure Key Vault + Workload Identity
@@ -422,4 +425,4 @@ Scale -> Rolling Update -> Rollback -> Readiness failure -> Gateway API
 
 依序學習：
 
-下一階段是 DNS/TLS、前端切換、Gateway access logs 與 API HPA。
+免費 DNS/TLS 與前端切換已完成設定；下一階段是 Gateway access logs 與 API HPA。
