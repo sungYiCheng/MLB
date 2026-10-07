@@ -1,5 +1,7 @@
 # Kubernetes Runtime Lab Notes
 
+> 這份文件保留 Gateway HTTP 階段的 runtime 實驗快照。現在 frontend 已切換到 AKS HTTPS；最新完整狀態請先看 [第一階段完整開發與部署指南](./phase-1-development-guide.md)。
+
 最後更新：2026-10-07
 
 這份筆記整理 MLB AI GO 實際部署到 AKS 後的架構、Kubernetes 核心觀念、部署流程與第一次 self-healing 實驗。
@@ -17,7 +19,7 @@
 - Readiness probe、liveness probe 與 cluster 內部 smoke test 已通過。
 - 手動刪除 Pod 後，ReplicaSet 已自動建立替代 Pod，self-healing 驗證成功。
 - Scale、Rolling Update、Rollback 與 Readiness failure 實驗已完成。
-- Managed Gateway API 已啟用，`http://20.24.106.104/health` 可從 cluster 外部存取。
+- Managed Gateway API 與免費 TLS 已啟用，`https://20-24-106-104.sslip.io/health` 可從 cluster 外部存取。
 
 目前實際資源：
 
@@ -98,14 +100,14 @@ Azure DevOps Pipeline 負責：
 flowchart TB
     subgraph Delivery[Azure DevOps]
         Repo[Azure DevOps Repo]
-        Pipeline[AKS Lab Pipeline<br/>Deploy run 30]
+        Pipeline[AKS Lab Pipeline<br/>HTTPS Deploy run 31]
     end
 
     subgraph SharedAzure[Shared Azure Resources]
         ACR[Azure Container Registry<br/>mlb-ai-api:aks-lab-30]
         AppInsights[Application Insights]
         SWA[Static Web Apps<br/>Angular frontend]
-        ContainerApp[Container Apps<br/>Current public backend]
+        ContainerApp[Container Apps<br/>Previous backend retained]
     end
 
     subgraph AKSResourceGroup[rg-mlb-ai-go-aks-lab]
@@ -123,8 +125,10 @@ flowchart TB
     subgraph Kubernetes[Kubernetes Namespace: mlb-ai-go]
         Deployment[Deployment<br/>mlb-ai-api]
         ReplicaSet[ReplicaSet<br/>desired replicas: 1]
-        Pod[Pod<br/>10.244.0.112:8080]
-        Service[ClusterIP Service<br/>10.0.105.212:80]
+        Pod[Pod<br/>dynamic Pod IP :8080]
+        Service[ClusterIP Service<br/>stable service :80]
+        Gateway[Gateway<br/>HTTPS :443]
+        Route[HTTPRoute]
         ConfigMap[ConfigMap]
         Secret[Secret]
         Probes[Readiness / Liveness]
@@ -147,12 +151,14 @@ flowchart TB
     Secret --> Pod
     Probes --> Pod
     Service -->|selector| Pod
+    Gateway --> Route
+    Route --> Service
     Pod --> AppInsights
 
-    SWA --> ContainerApp
+    SWA -->|HTTPS| Gateway
 ```
 
-圖中最後一條很重要：目前正式 frontend 仍呼叫 Container Apps backend，尚未切換到 AKS。AKS 是獨立的練習環境。
+圖中最後一條很重要：目前正式 frontend 已透過 HTTPS Gateway 呼叫 AKS。Container Apps backend 暫時保留，但 production frontend 不再使用它。
 
 ## Kubernetes Resource Ownership
 
@@ -184,11 +190,11 @@ Node pool 是一組規格相近的運算節點。目前只有：
 ```text
 nodepool1
   mode: System
-  count: 1
+  count: 2
   VM: Standard_D2_v4
 ```
 
-Node 是真正執行 Pod 的 VM。目前所有 system pods 與 MLB API Pod 都放在同一台 Node。
+Node 是真正執行 Pod 的 VM。目前有兩台 Node，供 system workloads、Gateway 元件與 MLB API Pod 排程。
 
 ### Namespace
 
@@ -380,7 +386,7 @@ Internet -> Public IP -> Azure Load Balancer -> Gateway proxy
          -> HTTPRoute -> ClusterIP Service -> Ready Pod:8080
 ```
 
-Static Web Apps 目前仍呼叫 Container Apps backend，尚未切換到 AKS。
+Static Web Apps 現在透過 `https://20-24-106-104.sslip.io` 呼叫 AKS Gateway，再由 Service 導向 Ready Pod。
 
 ## Gateway API Architecture
 

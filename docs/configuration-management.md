@@ -51,9 +51,13 @@ Cors__AllowedOrigins__0=https://yellow-forest-04081e300.5.azurestaticapps.net
 
 ## Prod
 
-目前還沒有正式 production domain。
+目前沒有購買自有 production domain，但 production frontend build 已指向 AKS Lab HTTPS：
 
-未來如果有正式前端網址，可以使用同樣方式設定：
+```text
+https://20-24-106-104.sslip.io
+```
+
+`sslip.io` 適合練習，不代表正式商用網域。未來若購買正式前端網址，可以使用同樣方式設定 CORS：
 
 ```text
 Cors__AllowedOrigins__0=https://正式前端網址
@@ -68,9 +72,7 @@ Cors__AllowedOrigins__2=https://第三個允許網址
 
 ## 與 AKS 的對應
 
-目前 Container Apps 用 environment variables。
-
-之後進 AKS 時，概念會對應到：
+Container Apps 使用 environment variables；AKS 已實際使用：
 
 ```text
 ConfigMap -> 非敏感設定
@@ -78,7 +80,7 @@ Secret    -> 密碼、token、connection string
 Deployment env -> 將 ConfigMap/Secret 注入 container
 ```
 
-這次 CORS 屬於非敏感設定，未來放 AKS 時比較像 ConfigMap。
+這次 CORS 屬於非敏感設定，放在 ConfigMap／Deployment environment；Application Insights connection string 由 Pipeline 動態建立成 Secret，真實值不進 Git。
 
 ## Pipeline 新增的檢查
 
