@@ -16,7 +16,7 @@
 - 從 cluster 外部請求 `http://20.24.106.104/health` 回傳 HTTP 200。
 - Azure DevOps Gateway Deploy run `#30` 成功，Deployment 實際 image 與 health metadata 均為 `aks-lab-30`。
 
-目前公開 API 僅使用 HTTP，尚未設定 DNS 與 TLS，因此只適合 Lab 學習。
+免費 HTTPS 設定已加入 repository，使用 `sslip.io`、Let’s Encrypt 與 cert-manager；實際 Azure 套用與驗證記錄在 `aks-https-tls.md`。
 
 ## Why Gateway API
 
@@ -194,7 +194,7 @@ Public /health:   HTTP 200 / healthy
 
 這一階段已完成「AKS backend 對外公開並可驗證」。尚未完成：
 
-- DNS 與 HTTPS/TLS。
+- 將 repository 內的免費 HTTPS overlay 實際部署並確認憑證為 `Ready=True`。
 - Azure Static Web Apps 前端改用 AKS API。
 - Gateway access logs 集中到 Azure Monitor。
 - API workload 自己的 HPA。

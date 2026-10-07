@@ -1,0 +1,18 @@
+- op: add
+  path: /spec/listeners/0/hostname
+  value: 20-24-106-104.sslip.io
+- op: add
+  path: /spec/listeners/-
+  value:
+    name: https
+    hostname: 20-24-106-104.sslip.io
+    protocol: HTTPS
+    port: 443
+    tls:
+      mode: Terminate
+      certificateRefs:
+        - name: mlb-ai-api-tls
+          kind: Secret
+    allowedRoutes:
+      namespaces:
+        from: Same

@@ -19,6 +19,12 @@ k8s/
       kustomization.yaml
       backend-gateway.yaml
       backend-http-route.yaml
+    gateway-tls/
+      kustomization.yaml
+      letsencrypt-cluster-issuer.yaml
+      backend-certificate.yaml
+      gateway-tls-patch.yaml
+      http-route-tls-patch.yaml
 ```
 
 ## Current Mapping
@@ -67,3 +73,13 @@ kubectl create secret generic mlb-ai-api-secrets `
 - 目前 HTTPRoute 沒有限制 hostname，方便學習時直接用 public IP 驗證。正式環境應再加上 DNS 與 TLS。
 - `backend-deployment.yaml` 目前使用 `acrmlbaigo.azurecr.io/mlb-ai-api:dev-latest`。正式部署時更建議改成 commit SHA tag。
 - AKS 要能拉 ACR image，需要讓 AKS kubelet identity 或 managed identity 有 ACR 的 `AcrPull` 權限。
+## Free HTTPS overlay
+
+`overlays/gateway-tls` 在 Gateway API 上加入免費的 HTTPS Lab 設定：
+
+- `20-24-106-104.sslip.io` 將 hostname 解析到目前 Gateway Public IP。
+- cert-manager 透過 Let’s Encrypt HTTP-01 取得並自動續期憑證。
+- Gateway port `443` 負責 TLS termination，再把 HTTP 流量送到 ClusterIP Service。
+- HTTP port `80` 仍保留，供 ACME HTTP-01 challenge 使用。
+
+這個 hostname 與目前 Public IP 綁定。若刪除並重建 Gateway、Public IP 改變，必須同步更新 overlay 與 `infra/aks-lab/variables.ps1`。

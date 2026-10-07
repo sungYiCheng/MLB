@@ -1,0 +1,9 @@
+- op: add
+  path: /spec/hostnames
+  value:
+    - 20-24-106-104.sslip.io
+- op: add
+  path: /spec/parentRefs/-
+  value:
+    name: mlb-ai-api-gateway
+    sectionName: https

@@ -21,5 +21,8 @@ $AksLabConfig = @{
     KubernetesDeploymentName = 'mlb-ai-api'
     KubernetesServiceName = 'mlb-ai-api'
     KubernetesGatewayName = 'mlb-ai-api-gateway'
+    TlsHostname = '20-24-106-104.sslip.io'
+    TlsCertificateName = 'mlb-ai-api-tls'
+    CertManagerVersion = 'v1.21.2'
     FrontendOrigin = 'https://yellow-forest-04081e300.5.azurestaticapps.net'
 }

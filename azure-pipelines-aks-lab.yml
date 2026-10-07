@@ -31,6 +31,11 @@ parameters:
     type: boolean
     default: false
 
+  - name: includeTls
+    displayName: Enable free HTTPS with sslip.io and Let's Encrypt
+    type: boolean
+    default: false
+
   - name: confirmDestroy
     displayName: Confirm deletion of the AKS cluster and billable resources
     type: boolean
@@ -61,6 +66,12 @@ stages:
             inputs:
               kubectlVersion: 'latest'
             condition: or(eq('${{ parameters.operation }}', 'Deploy'), eq('${{ parameters.operation }}', 'Preflight'))
+
+          - task: HelmInstaller@1
+            displayName: Install Helm for cert-manager
+            inputs:
+              helmVersionToInstall: '3.17.3'
+            condition: and(eq('${{ parameters.operation }}', 'Deploy'), eq('${{ parameters.includeTls }}', 'true'))
 
           - task: AzureCLI@2
             displayName: Run AKS lab operation
@@ -95,6 +106,10 @@ stages:
 
                 if ('${{ parameters.includeGateway }}' -eq 'true') {
                   $scriptArguments.IncludeGateway = $true
+                }
+
+                if ('${{ parameters.includeTls }}' -eq 'true') {
+                  $scriptArguments.IncludeTls = $true
                 }
 
                 if ('${{ parameters.confirmDestroy }}' -eq 'true') {

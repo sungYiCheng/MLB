@@ -7,6 +7,7 @@ param(
     [string]$ImageTag = 'dev-latest',
     [string]$BuildId = 'manual',
     [switch]$IncludeGateway,
+    [switch]$IncludeTls,
     [switch]$ConfirmDestroy
 )
 
@@ -39,9 +40,17 @@ $kubernetesNamespace = $AksLabConfig.KubernetesNamespace
 $kubernetesDeploymentName = $AksLabConfig.KubernetesDeploymentName
 $kubernetesServiceName = $AksLabConfig.KubernetesServiceName
 $kubernetesGatewayName = $AksLabConfig.KubernetesGatewayName
+$tlsHostname = $AksLabConfig.TlsHostname
+$tlsCertificateName = $AksLabConfig.TlsCertificateName
+$certManagerVersion = $AksLabConfig.CertManagerVersion
 $frontendOrigin = $AksLabConfig.FrontendOrigin
 $baseManifestPath = Join-Path $repoRoot 'k8s\base'
 $gatewayManifestPath = Join-Path $repoRoot 'k8s\overlays\gateway'
+$gatewayTlsManifestPath = Join-Path $repoRoot 'k8s\overlays\gateway-tls'
+
+if ($IncludeTls -and -not $IncludeGateway) {
+    throw '-IncludeTls requires -IncludeGateway because the certificate terminates at the public Gateway.'
+}
 
 function Invoke-AzCli {
     param(
@@ -110,6 +119,19 @@ function Invoke-Kubectl {
     }
 }
 
+function Invoke-Helm {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    Write-Host ('[helm] helm ' + ($Arguments -join ' '))
+    & helm @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Helm command failed: helm $($Arguments -join ' ')"
+    }
+}
+
 if (-not [string]::IsNullOrWhiteSpace($subscription)) {
     Invoke-AzCli -Arguments @('account', 'set', '--subscription', $subscription)
 }
@@ -130,6 +152,10 @@ switch ($Operation) {
         Write-Host "Image              : $acrName.azurecr.io/${imageRepository}:$ImageTag"
         Write-Host 'Gateway API        : enabled during cluster creation'
         Write-Host "Public gateway     : $([bool]$IncludeGateway)"
+        Write-Host "Free TLS           : $([bool]$IncludeTls)"
+        if ($IncludeTls) {
+            Write-Host "HTTPS hostname     : $tlsHostname"
+        }
         Write-Host 'The existing dev resource group will not be deleted by this workflow.'
         break
     }
@@ -265,7 +291,8 @@ switch ($Operation) {
 
         Invoke-Kubectl -Arguments @('kustomize', $baseManifestPath)
         Invoke-Kubectl -Arguments @('kustomize', $gatewayManifestPath)
-        Write-Host 'Kustomize          : base and Gateway API overlay rendered successfully'
+        Invoke-Kubectl -Arguments @('kustomize', $gatewayTlsManifestPath)
+        Write-Host 'Kustomize          : base, Gateway API, and free TLS overlays rendered successfully'
         Write-Host 'Preflight completed without creating or changing AKS resources.'
         break
     }
@@ -390,6 +417,20 @@ switch ($Operation) {
             '--output', 'tsv'
         ) -CaptureOutput
 
+        if ($IncludeTls) {
+            Invoke-Helm -Arguments @(
+                'upgrade', '--install', 'cert-manager',
+                'oci://quay.io/jetstack/charts/cert-manager',
+                '--namespace', 'cert-manager',
+                '--create-namespace',
+                '--version', $certManagerVersion,
+                '--set', 'crds.enabled=true',
+                '--set', 'config.gatewayAPI.enabled=true',
+                '--wait',
+                '--timeout', '10m'
+            )
+        }
+
         Invoke-Kubectl -Arguments @('apply', '-f', (Join-Path $baseManifestPath 'namespace.yaml'))
 
         $secretArguments = @(
@@ -410,7 +451,9 @@ switch ($Operation) {
             throw 'Failed to create or update the Application Insights Kubernetes Secret.'
         }
 
-        if ($IncludeGateway) {
+        if ($IncludeTls) {
+            Invoke-Kubectl -Arguments @('apply', '-k', $gatewayTlsManifestPath)
+        } elseif ($IncludeGateway) {
             Invoke-Kubectl -Arguments @('apply', '-k', $gatewayManifestPath)
         } else {
             Invoke-Kubectl -Arguments @('apply', '-k', $baseManifestPath)
@@ -465,6 +508,15 @@ switch ($Operation) {
                 throw 'The approuting-istio GatewayClass is not accepted.'
             }
 
+            if ($IncludeTls) {
+                Invoke-Kubectl -Arguments @(
+                    'wait', '--for=condition=Ready',
+                    "certificate/$tlsCertificateName",
+                    '--namespace', $kubernetesNamespace,
+                    '--timeout=10m'
+                )
+            }
+
             Invoke-Kubectl -Arguments @(
                 'wait', '--for=condition=programmed',
                 "gateway/$kubernetesGatewayName",
@@ -481,7 +533,15 @@ switch ($Operation) {
                 throw 'The Gateway is programmed but no public address was returned.'
             }
 
-            $healthUrl = "http://$gatewayAddress/health"
+            if ($IncludeTls) {
+                $resolvedAddresses = [System.Net.Dns]::GetHostAddresses($tlsHostname).IPAddressToString
+                if ($gatewayAddress -notin $resolvedAddresses) {
+                    throw "TLS hostname $tlsHostname resolves to $($resolvedAddresses -join ', '), not Gateway address $gatewayAddress. Update TlsHostname after the Gateway IP changes."
+                }
+                $healthUrl = "https://$tlsHostname/health"
+            } else {
+                $healthUrl = "http://$gatewayAddress/health"
+            }
             Write-Host "Gateway address     : $gatewayAddress"
             Write-Host "Gateway health URL  : $healthUrl"
 

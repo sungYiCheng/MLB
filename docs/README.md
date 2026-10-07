@@ -13,3 +13,4 @@
 - [AKS Lab 操作手冊與實作紀錄](./aks-lab-runbook.md)：純 Azure、無本機 Docker 的操作流程，以及前置資源、RBAC、Preflight 與故障排除紀錄。
 - [Kubernetes Runtime 實作筆記](./kubernetes-runtime-lab.md)：目前 AKS runtime 架構、部署流程、資源關係、網路、probes、self-healing 與常用指令。
 - [AKS Gateway API 實作筆記](./gateway-api-lab.md)：Managed Gateway API、Istio application routing、容量問題、Gateway/HTTPRoute、Public IP 與外部 smoke test。
+- [AKS 免費 HTTPS 實作筆記](./aks-https-tls.md)：sslip.io、Let’s Encrypt、cert-manager、Gateway TLS termination 與驗證流程。
