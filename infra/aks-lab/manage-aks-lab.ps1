@@ -410,7 +410,11 @@ switch ($Operation) {
             throw 'Failed to create or update the Application Insights Kubernetes Secret.'
         }
 
-        Invoke-Kubectl -Arguments @('apply', '-k', $baseManifestPath)
+        if ($IncludeGateway) {
+            Invoke-Kubectl -Arguments @('apply', '-k', $gatewayManifestPath)
+        } else {
+            Invoke-Kubectl -Arguments @('apply', '-k', $baseManifestPath)
+        }
 
         $image = "$acrName.azurecr.io/${imageRepository}:$ImageTag"
         Invoke-Kubectl -Arguments @(
@@ -461,7 +465,6 @@ switch ($Operation) {
                 throw 'The approuting-istio GatewayClass is not accepted.'
             }
 
-            Invoke-Kubectl -Arguments @('apply', '-k', $gatewayManifestPath)
             Invoke-Kubectl -Arguments @(
                 'wait', '--for=condition=programmed',
                 "gateway/$kubernetesGatewayName",

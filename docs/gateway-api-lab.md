@@ -152,8 +152,9 @@ curl http://20.24.106.104/health
 1. Create 時啟用 Managed Gateway API 與 Application Routing Istio。
 2. 重建 Lab 時預設建立兩個 Node。
 3. Deploy 且 `includeGateway=true` 時套用 Gateway overlay。
-4. 等待 Gateway `Programmed=True`。
-5. 取得 Public IP 並從 Pipeline agent 執行 `/health` smoke test。
+4. 套用 manifests 後才以本次 Build 的 immutable tag 更新 Deployment image，避免 overlay 把 image 覆寫回 `dev-latest`。
+5. 等待 Gateway `Programmed=True`。
+6. 取得 Public IP 並從 Pipeline agent 執行 `/health` smoke test。
 
 ## Current Boundary
 
