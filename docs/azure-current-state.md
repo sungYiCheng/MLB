@@ -239,8 +239,8 @@ Plan -> Preflight -> Create -> Deploy -> Stop / Start -> Status -> Destroy
 
 - Preflight run `#26` 成功。
 - Create run `#27` 成功。
-- Deploy run `#28` 成功。
-- Image 為 `acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-28`。
+- Gateway Deploy run `#30` 成功。
+- Image 為 `acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-30`。
 - Cluster 內部 `/health` smoke test 成功。
 
 ## AKS Runtime
@@ -259,10 +259,10 @@ aks-mlb-ai-go-lab
 ```text
 Namespace:  mlb-ai-go
 Deployment: mlb-ai-api 1/1 available
-Pod:        mlb-ai-api-869dfc6cd5-s5rw4 1/1 Running
-Image:      acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-28
+Pod:        mlb-ai-api-59dbdd9457-pvcgw 1/1 Running
+Image:      acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-30
 Service:    ClusterIP 10.0.105.212:80
-Endpoint:   10.244.0.112:8080
+Endpoint:   10.244.1.28:8080 (Pod IP may change)
 ConfigMap:  mlb-ai-api-config
 Secret:     mlb-ai-api-secrets
 Gateway:    mlb-ai-api-gateway Programmed=True

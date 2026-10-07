@@ -14,6 +14,7 @@
 - `HTTPRoute/mlb-ai-api` 為 `Accepted=True` 且 `ResolvedRefs=True`。
 - Azure Load Balancer 已分配 Public IP `20.24.106.104`。
 - 從 cluster 外部請求 `http://20.24.106.104/health` 回傳 HTTP 200。
+- Azure DevOps Gateway Deploy run `#30` 成功，Deployment 實際 image 與 health metadata 均為 `aks-lab-30`。
 
 目前公開 API 僅使用 HTTP，尚未設定 DNS 與 TLS，因此只適合 Lab 學習。
 
@@ -155,6 +156,39 @@ curl http://20.24.106.104/health
 4. 套用 manifests 後才以本次 Build 的 immutable tag 更新 Deployment image，避免 overlay 把 image 覆寫回 `dev-latest`。
 5. 等待 Gateway `Programmed=True`。
 6. 取得 Public IP 並從 Pipeline agent 執行 `/health` smoke test。
+
+### Pipeline Verification And Ordering Bug
+
+第一次 Gateway Pipeline run `#29` 顯示 succeeded，公開 health response 也顯示 `aks-lab-29`，但獨立查詢 Deployment 後發現實際 image 被覆寫成：
+
+```text
+acrmlbaigo.azurecr.io/mlb-ai-api:dev-latest
+```
+
+原因是 Deploy 先執行 `kubectl set image`，後面又套用包含 base 的 Gateway overlay，把 Deployment image 改回 manifest 中的 `dev-latest`。這也說明 health metadata 不能單獨當成實際 image 的證據。
+
+修正後的順序為：
+
+```text
+apply Gateway overlay
+  -> set image to aks-lab-<BuildId>
+  -> set deployment metadata env vars
+  -> wait for rollout
+  -> internal smoke test
+  -> public Gateway smoke test
+```
+
+第二次 run `#30` 完成後，獨立驗證一致：
+
+```text
+Deployment image: aks-lab-30
+AppVersion:       aks-lab-30
+BuildId:          30
+ImageTag:         aks-lab-30
+Gateway:          Programmed=True
+HTTPRoute:        Accepted=True
+Public /health:   HTTP 200 / healthy
+```
 
 ## Current Boundary
 

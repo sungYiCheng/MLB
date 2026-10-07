@@ -17,7 +17,7 @@
 - 修正為 `Standard_D2_v4` 並加入實際 quota gate，commit `9871956` 已同步到 GitHub 與 Azure DevOps。
 - 修正後的雲端 Preflight run `#26` 成功。
 - AKS Create run `#27` 成功。
-- AKS Deploy run `#28` 成功，MLB API、ClusterIP Service、ConfigMap、Secret 與 probes 已建立。
+- AKS Deploy run `#28` 完成第一次內部部署；Gateway Deploy run `#30` 已完成公開入口與 immutable image 驗證。
 - 手動刪除 MLB API Pod 後，ReplicaSet 成功建立替代 Pod，self-healing 已驗證。
 - Scale、Rolling Update、Rollback 與 Readiness failure 實驗已完成。
 - Managed Gateway API 與 Application Routing Istio 已啟用。
@@ -46,10 +46,10 @@ Cluster 狀態為 `Succeeded / Running`，system node pool 是 `2 x Standard_D2_
 ```text
 Namespace:  mlb-ai-go
 Deployment: mlb-ai-api 1/1 available
-Pod:        mlb-ai-api-869dfc6cd5-s5rw4 1/1 Running
-Image:      acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-28
+Pod:        mlb-ai-api-59dbdd9457-pvcgw 1/1 Running
+Image:      acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-30
 Service:    ClusterIP 10.0.105.212:80
-Endpoint:   10.244.0.112:8080
+Endpoint:   10.244.1.28:8080 (Pod IP may change)
 ```
 
 詳細 Kubernetes runtime 架構與 self-healing 筆記請看 [Kubernetes Runtime Lab Notes](./kubernetes-runtime-lab.md)。

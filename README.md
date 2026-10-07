@@ -100,7 +100,7 @@ Current AKS lab status:
 
 - Cluster `aks-mlb-ai-go-lab` is running in East Asia.
 - The system pool has two `Standard_D2_v4` nodes so both managed `istiod` replicas can be scheduled.
-- Deploy run `#28` published `mlb-ai-api:aks-lab-28` and deployed it to namespace `mlb-ai-go`.
+- Deploy run `#30` published and deployed the immutable image `mlb-ai-api:aks-lab-30` to namespace `mlb-ai-go`.
 - The Deployment, Pod, ClusterIP Service, ConfigMap, Secret, health probes, and internal smoke test are working.
 - The managed Gateway API is enabled and the public `/health` endpoint is available at `http://20.24.106.104/health`.
 - `Gateway/mlb-ai-api-gateway` is programmed and `HTTPRoute/mlb-ai-api` is accepted.

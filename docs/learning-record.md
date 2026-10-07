@@ -275,15 +275,15 @@ MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia
 
 Create run `#27` 成功，cluster 為 `Succeeded / Running`，Kubernetes node 為 `Ready`。
 
-Deploy run `#28` 成功，目前 runtime 狀態：
+Gateway Deploy run `#30` 成功，目前 runtime 狀態：
 
 ```text
 Namespace:  mlb-ai-go
 Deployment: mlb-ai-api 1/1 available
 Pod:        1/1 Running, restarts 0
-Image:      acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-28
+Image:      acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-30
 Service:    ClusterIP 10.0.105.212:80
-Endpoint:   Pod 10.244.0.112:8080
+Endpoint:   Pod IP is dynamic; current verification used port 8080
 ```
 
 已完成第一次 self-healing 實驗：手動刪除 MLB API Pod 後，ReplicaSet 自動建立替代 Pod；Service IP 不變，並重新指向新 Pod endpoint。

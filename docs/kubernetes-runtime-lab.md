@@ -11,8 +11,8 @@
 - AKS cluster `aks-mlb-ai-go-lab` 建立成功。
 - Kubernetes 版本為 `1.35.8`。
 - System node pool 為 `2 x Standard_D2_v4`，OS disk 各 32 GiB。
-- Azure DevOps AKS Lab Pipeline run `#28` 部署成功。
-- Backend image 為 `acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-28`。
+- Azure DevOps AKS Lab Pipeline run `#30` 完整 Gateway Deploy 成功。
+- Backend image 為 `acrmlbaigo.azurecr.io/mlb-ai-api:aks-lab-30`。
 - Namespace、Deployment、ReplicaSet、Pod、Service、ConfigMap 與 Secret 都已建立。
 - Readiness probe、liveness probe 與 cluster 內部 smoke test 已通過。
 - 手動刪除 Pod 後，ReplicaSet 已自動建立替代 Pod，self-healing 驗證成功。
@@ -98,11 +98,11 @@ Azure DevOps Pipeline 負責：
 flowchart TB
     subgraph Delivery[Azure DevOps]
         Repo[Azure DevOps Repo]
-        Pipeline[AKS Lab Pipeline<br/>Deploy run 28]
+        Pipeline[AKS Lab Pipeline<br/>Deploy run 30]
     end
 
     subgraph SharedAzure[Shared Azure Resources]
-        ACR[Azure Container Registry<br/>mlb-ai-api:aks-lab-28]
+        ACR[Azure Container Registry<br/>mlb-ai-api:aks-lab-30]
         AppInsights[Application Insights]
         SWA[Static Web Apps<br/>Angular frontend]
         ContainerApp[Container Apps<br/>Current public backend]
@@ -351,7 +351,7 @@ sequenceDiagram
     participant Service as ClusterIP Service
 
     Dev->>Pipeline: Run Deploy
-    Pipeline->>ACR: Build mlb-ai-api:aks-lab-28
+    Pipeline->>ACR: Build mlb-ai-api:aks-lab-30
     Pipeline->>API: Apply Namespace, ConfigMap, Deployment, Service
     Pipeline->>API: Create/update Secret
     Pipeline->>API: Set image and deployment metadata
