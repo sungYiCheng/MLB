@@ -27,6 +27,81 @@
       </div>
     </div>
 
+    <section class="dashboard-section briefing-board" aria-label="AI daily briefing preview">
+      <button
+        type="button"
+        class="section-toggle"
+        (click)="toggleSection('aiBriefing')"
+        [attr.aria-expanded]="isSectionExpanded('aiBriefing')"
+      >
+        <span>
+          <span class="section-kicker">AI Learning Lab</span>
+          <span class="section-title">Daily Briefing</span>
+        </span>
+        <span class="toggle-copy">
+          <span>{{ dailyBriefing()?.isAiGenerated ? 'AI generated' : 'Preview mode' }}</span>
+          <span class="expand-icon" aria-hidden="true">
+            {{ isSectionExpanded('aiBriefing') ? '−' : '+' }}
+          </span>
+        </span>
+      </button>
+
+      @if (isSectionExpanded('aiBriefing')) {
+        @if (isBriefingLoading()) {
+          <div class="briefing-state">Preparing the daily briefing...</div>
+        } @else if (briefingErrorMessage()) {
+          <div class="briefing-state briefing-error">{{ briefingErrorMessage() }}</div>
+        } @else if (dailyBriefing(); as briefing) {
+          <div class="briefing-content">
+            <div class="briefing-intro">
+              <span class="mode-badge" [class.ai-mode]="briefing.isAiGenerated">
+                {{ briefing.isAiGenerated ? 'Grounded AI' : 'Deterministic preview' }}
+              </span>
+              <h2>{{ briefing.headline }}</h2>
+              <p>{{ briefing.summary }}</p>
+              <time>Generated {{ formatTaipeiTime(briefing.generatedAtUtc) }}</time>
+            </div>
+
+            <div class="briefing-columns">
+              <section class="briefing-list">
+                <h3>Key games</h3>
+                @if (briefing.keyGames.length === 0) {
+                  <p class="empty-note">No matchups are scheduled for this briefing.</p>
+                } @else {
+                  @for (item of briefing.keyGames; track item.title) {
+                    <article>
+                      <strong>{{ item.title }}</strong>
+                      <span>{{ item.detail }}</span>
+                    </article>
+                  }
+                }
+              </section>
+
+              <section class="briefing-list">
+                <h3>Players to watch</h3>
+                @if (briefing.playersToWatch.length === 0) {
+                  <p class="empty-note">Player insights will appear when leader data is available.</p>
+                } @else {
+                  @for (item of briefing.playersToWatch; track item.title) {
+                    <article>
+                      <strong>{{ item.title }}</strong>
+                      <span>{{ item.detail }}</span>
+                    </article>
+                  }
+                }
+              </section>
+            </div>
+
+            <ul class="briefing-notes">
+              @for (note of briefing.dataNotes; track note) {
+                <li>{{ note }}</li>
+              }
+            </ul>
+          </div>
+        }
+      }
+    </section>
+
     @if (statLeaders(); as currentLeaders) {
       <section class="dashboard-section leaders-board" aria-label="MLB stat leaders">
         <button

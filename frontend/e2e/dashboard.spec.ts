@@ -30,6 +30,21 @@ test('daily games section can collapse and expand', async ({ page }) => {
   await expect(gamesToggle).toHaveAttribute('aria-expanded', 'true');
 });
 
+test('daily briefing section can collapse and expand', async ({ page }) => {
+  await page.goto('/');
+
+  const briefingToggle = page.getByRole('button', { name: /AI Learning Lab[\s\S]*Daily Briefing/ });
+
+  await expect(briefingToggle).toBeVisible();
+  await expect(briefingToggle).toHaveAttribute('aria-expanded', 'true');
+
+  await briefingToggle.click();
+  await expect(briefingToggle).toHaveAttribute('aria-expanded', 'false');
+
+  await briefingToggle.click();
+  await expect(briefingToggle).toHaveAttribute('aria-expanded', 'true');
+});
+
 test('deployed dashboard finishes the initial data load', async ({ page }) => {
   await page.goto('/');
 

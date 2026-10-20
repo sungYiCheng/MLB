@@ -1,4 +1,5 @@
 using MlbAi.Application.Interfaces;
+using MlbAi.Application.Services;
 using MlbAi.Infrastructure.Services;
 
 const string appName = "MLB AI Daily API";
@@ -142,6 +143,40 @@ app.MapGet("/api/stat-leaders", async (IMlbService mlbService, CancellationToken
     {
         var leaders = await mlbService.GetStatLeadersAsync(cancellationToken);
         return Results.Ok(leaders);
+    }
+    catch (HttpRequestException ex)
+    {
+        return Results.Problem(
+            title: "MLB Stats API unavailable",
+            detail: app.Environment.IsDevelopment() ? ex.Message : null,
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+    {
+        return Results.Problem(
+            title: "MLB Stats API timeout",
+            detail: app.Environment.IsDevelopment() ? ex.Message : null,
+            statusCode: StatusCodes.Status504GatewayTimeout);
+    }
+});
+
+app.MapGet("/api/ai/daily-briefing", async (IMlbService mlbService, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var gamesTask = mlbService.GetTodayGamesAsync(cancellationToken);
+        var standingsTask = mlbService.GetStandingsAsync(cancellationToken);
+        var statLeadersTask = mlbService.GetStatLeadersAsync(cancellationToken);
+
+        await Task.WhenAll(gamesTask, standingsTask, statLeadersTask);
+
+        var briefing = DailyBriefingPreviewService.Create(
+            await gamesTask,
+            await standingsTask,
+            await statLeadersTask,
+            DateTimeOffset.UtcNow);
+
+        return Results.Ok(briefing);
     }
     catch (HttpRequestException ex)
     {

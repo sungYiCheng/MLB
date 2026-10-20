@@ -33,12 +33,15 @@ export class App implements OnInit {
   protected readonly games = signal<MlbGame[]>([]);
   protected readonly standings = signal<MlbStandings | null>(null);
   protected readonly statLeaders = signal<MlbStatLeaders | null>(null);
+  protected readonly dailyBriefing = signal<DailyBriefing | null>(null);
   protected readonly expandedGameIds = signal<ReadonlySet<string>>(new Set());
   protected readonly expandedSections = signal<ReadonlySet<SectionKey>>(
-    new Set(['leaders', 'divisionStandings', 'wildCard', 'games'])
+    new Set(['aiBriefing', 'leaders', 'divisionStandings', 'wildCard', 'games'])
   );
   protected readonly isLoading = signal(true);
+  protected readonly isBriefingLoading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
+  protected readonly briefingErrorMessage = signal<string | null>(null);
 
   protected readonly totalGames = computed(() => this.games().length);
   protected readonly liveGames = computed(
@@ -55,6 +58,7 @@ export class App implements OnInit {
   protected loadGames(): void {
     this.isLoading.set(true);
     this.errorMessage.set(null);
+    this.loadDailyBriefing();
 
     forkJoin({
       games: this.http.get<MlbGame[]>(this.apiUrl('/api/games/today')),
@@ -70,6 +74,23 @@ export class App implements OnInit {
       error: () => {
         this.errorMessage.set('Could not load MLB data. Check that the backend API is running.');
         this.isLoading.set(false);
+      }
+    });
+  }
+
+  private loadDailyBriefing(): void {
+    this.isBriefingLoading.set(true);
+    this.briefingErrorMessage.set(null);
+
+    this.http.get<DailyBriefing>(this.apiUrl('/api/ai/daily-briefing')).subscribe({
+      next: (dailyBriefing) => {
+        this.dailyBriefing.set(dailyBriefing);
+        this.isBriefingLoading.set(false);
+      },
+      error: () => {
+        this.dailyBriefing.set(null);
+        this.briefingErrorMessage.set('The daily briefing preview is temporarily unavailable.');
+        this.isBriefingLoading.set(false);
       }
     });
   }
@@ -340,4 +361,20 @@ interface MlbStatLeader {
   leagueName: string | null;
 }
 
-type SectionKey = 'leaders' | 'divisionStandings' | 'wildCard' | 'games';
+interface DailyBriefing {
+  mode: string;
+  isAiGenerated: boolean;
+  headline: string;
+  summary: string;
+  keyGames: DailyBriefingItem[];
+  playersToWatch: DailyBriefingItem[];
+  dataNotes: string[];
+  generatedAtUtc: string;
+}
+
+interface DailyBriefingItem {
+  title: string;
+  detail: string;
+}
+
+type SectionKey = 'aiBriefing' | 'leaders' | 'divisionStandings' | 'wildCard' | 'games';

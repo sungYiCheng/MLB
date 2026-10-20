@@ -141,6 +141,144 @@ h1 {
   box-shadow: 0 22px 52px rgba(15, 23, 42, 0.13);
 }
 
+.briefing-board {
+  border-color: rgba(14, 116, 144, 0.24);
+  background:
+    linear-gradient(135deg, rgba(236, 253, 245, 0.96), rgba(239, 246, 255, 0.96)),
+    #ffffff;
+}
+
+.briefing-state {
+  min-height: 92px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dbe7e2;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.76);
+  color: #52606d;
+  font-weight: 850;
+  text-align: center;
+}
+
+.briefing-error {
+  color: #991b1b;
+}
+
+.briefing-content,
+.briefing-intro {
+  display: grid;
+  gap: 10px;
+}
+
+.briefing-intro {
+  padding: 16px;
+  border: 1px solid rgba(14, 116, 144, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.briefing-intro h2,
+.briefing-list h3,
+.briefing-intro p {
+  margin: 0;
+}
+
+.briefing-intro h2 {
+  color: #0f172a;
+  font-size: 1.45rem;
+  line-height: 1.2;
+}
+
+.briefing-intro p {
+  color: #334155;
+  font-weight: 760;
+  line-height: 1.55;
+}
+
+.briefing-intro time {
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 820;
+}
+
+.mode-badge {
+  width: fit-content;
+  padding: 5px 8px;
+  border: 1px solid rgba(14, 116, 144, 0.24);
+  border-radius: 999px;
+  background: rgba(14, 116, 144, 0.08);
+  color: #0e7490;
+  font-size: 0.68rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.mode-badge.ai-mode {
+  border-color: rgba(21, 71, 52, 0.28);
+  background: rgba(21, 71, 52, 0.1);
+  color: #154734;
+}
+
+.briefing-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.briefing-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #dbe7e2;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.briefing-list h3 {
+  color: #111827;
+  font-size: 0.92rem;
+}
+
+.briefing-list article {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border-left: 3px solid #0e7490;
+  background: #f8fafc;
+}
+
+.briefing-list strong {
+  color: #111827;
+}
+
+.briefing-list article span {
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 760;
+  line-height: 1.4;
+}
+
+.briefing-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.briefing-notes li {
+  padding: 6px 9px;
+  border: 1px solid #dbe7e2;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #52606d;
+  font-size: 0.7rem;
+  font-weight: 820;
+}
+
 .section-toggle {
   display: flex;
   align-items: center;
@@ -980,6 +1118,7 @@ h1 {
   }
 
   .team-details,
+  .briefing-columns,
   .insight-sections,
   .split-panels {
     grid-template-columns: 1fr;
