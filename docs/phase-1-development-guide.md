@@ -2,6 +2,8 @@
 
 最後更新：2026-10-07
 
+> 本文保留第一階段把 production frontend 切到 AKS 的實驗快照。2026-10-20 的現在狀態是：AKS 已停止，正式 frontend 已切回 Container Apps，並已加入 Azure OpenAI。請先看 [目前架構總覽](./current-architecture.md) 與 [AKS 目前完整架構](./aks-current-architecture.md)。
+
 這份文件用白話整理 MLB AI Daily 第一階段的完整過程。閱讀完後，應該能回答三個問題：
 
 1. 這個專案現在放在哪裡、怎麼運作？
@@ -24,7 +26,7 @@
   -> Azure Static Web Apps 前端呼叫 AKS API
 ```
 
-目前公開網址：
+當時實驗網址：
 
 ```text
 Frontend: https://yellow-forest-04081e300.5.azurestaticapps.net
@@ -32,7 +34,7 @@ AKS API:  https://20-24-106-104.sslip.io
 Health:   https://20-24-106-104.sslip.io/health
 ```
 
-現在使用者打開前端後，資料請求確實會進入 AKS 裡的 API Pod。原本的 Container Apps backend 尚未刪除，但已不是前端 production bundle 使用的 API。
+當時使用者打開前端後，資料請求會進入 AKS 裡的 API Pod。現在 AKS 已停止，production bundle 已重新部署為呼叫 Container Apps。
 
 ## 目前完整架構
 
@@ -109,7 +111,7 @@ http://localhost:5106
 frontend/src/environments/environment.production.ts
 ```
 
-目前 production API base URL 已改成 AKS HTTPS hostname。
+第一階段曾把 production API base URL 改成 AKS HTTPS hostname；現在已切回 Container Apps backend。
 
 ### 這裡學到什麼
 
@@ -267,7 +269,7 @@ azure-pipelines-aks-lab.yml
   -> 手動 Build / Deploy 到 AKS
 ```
 
-Production frontend 現在呼叫 AKS。因此未來修改 backend 後，只看到一般 Backend Pipeline 成功還不夠；還要手動執行 AKS Lab `Deploy`，AKS Pod 才會換成新 image。第二階段可以再把這兩條流程整合，讓通過測試的 image 以 promotion 方式部署到 AKS。
+在第一階段的 AKS 上線實驗中，production frontend 曾呼叫 AKS，因此修改 backend 後還要手動執行 AKS Lab `Deploy`。現在正式 frontend 已切回 Container Apps；AKS Pipeline 仍是獨立、手動的 Lab 流程。
 
 ### Service Connection 是什麼
 
@@ -726,7 +728,7 @@ includeTls:     true
 - `Stop`：保留 cluster 設定，之後可較快 Start；部分非 compute 資源仍可能計費。
 - `Destroy`：刪除 AKS 與 `MC_*` node RG，最省長期費用，但下次要重新 Create 與 Deploy。
 
-前端現在依賴 AKS。Stop 或 Destroy 後，Static Web Apps 頁面仍可打開，但 API 資料會載入失敗。
+在當時的 AKS 上線實驗中，Stop 或 Destroy 會讓 Static Web Apps 的 API 資料載入失敗。現在 frontend 已切回 Container Apps，因此停止 AKS 不會中斷正式網站。
 
 ## 目前費用邊界
 

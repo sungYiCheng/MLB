@@ -4,7 +4,9 @@
 
 ## Current Progress
 
-最後更新：2026-10-07
+最後更新：2026-10-20
+
+> Azure 現況：AKS power state 為 `Stopped`，兩台 `Standard_D2_v4` Node 也為 `Stopped`。以下清單保留已完成的實驗成果；最新資源關係請看 [AKS 目前完整架構](./aks-current-architecture.md)。
 
 目前已完成 AKS 建立前準備、雲端驗證與第一次成功建立：
 
@@ -24,7 +26,7 @@
 - Node pool 因 `istiod` CPU Requests 從 1 擴成 2，兩個 `istiod` 均已 Running。
 - `Gateway/mlb-ai-api-gateway` 與 `HTTPRoute/mlb-ai-api` 已部署，公開 `/health` 回傳 HTTP 200。
 
-目前 AKS 有兩個 node VM、managed disks、Gateway Load Balancer 與 Public IP，都可能產生費用。MLB API 已透過 `http://20.24.106.104` 對外公開。
+AKS 保留兩個 node VM 的設定、managed disks、Gateway Load Balancer 與 Public IP 等資源；目前 cluster 停止，不提供 MLB API 流量。停止前曾透過 `20.24.106.104` 對外公開。
 
 目前主要結構為：
 

@@ -1,6 +1,6 @@
 # Kubernetes Runtime Lab Notes
 
-> 這份文件保留 Gateway HTTP 階段的 runtime 實驗快照。現在 frontend 已切換到 AKS HTTPS；最新完整狀態請先看 [第一階段完整開發與部署指南](./phase-1-development-guide.md)。
+> 這份文件保留 Gateway HTTP/HTTPS 階段的 runtime 實驗快照。AKS 現在已停止，正式 frontend 已切回 Container Apps；最新狀態請先看 [AKS 目前完整架構](./aks-current-architecture.md)。
 
 最後更新：2026-10-07
 
@@ -158,7 +158,7 @@ flowchart TB
     SWA -->|HTTPS| Gateway
 ```
 
-圖中最後一條很重要：目前正式 frontend 已透過 HTTPS Gateway 呼叫 AKS。Container Apps backend 暫時保留，但 production frontend 不再使用它。
+這張圖記錄 AKS HTTPS 實驗當時的流量。現在 AKS 已停止，正式 frontend 已切回 Container Apps；重新啟動並驗證 Gateway 後才能再切回這條路徑。
 
 ## Kubernetes Resource Ownership
 
@@ -386,7 +386,7 @@ Internet -> Public IP -> Azure Load Balancer -> Gateway proxy
          -> HTTPRoute -> ClusterIP Service -> Ready Pod:8080
 ```
 
-Static Web Apps 現在透過 `https://20-24-106-104.sslip.io` 呼叫 AKS Gateway，再由 Service 導向 Ready Pod。
+在 AKS HTTPS 實驗階段，Static Web Apps 曾透過 `https://20-24-106-104.sslip.io` 呼叫 AKS Gateway，再由 Service 導向 Ready Pod。目前 AKS 已停止，這個位址不應視為正在提供正式流量。
 
 ## Gateway API Architecture
 
@@ -448,7 +448,7 @@ kubectl scale deployment/mlb-ai-api --replicas=1 -n mlb-ai-go
 
 ## Current Cost And Cleanup Boundary
 
-目前 AKS 正在 Running，因此 node VM、managed disk 與部分網路資源開始計費。應用 Pod 本身不會另外建立 VM，目前仍共用同一台 node。
+這段實驗當時 AKS 正在 Running，因此 node VM、managed disk 與部分網路資源開始計費。現在 cluster 已停止，兩台 Node 均為 Stopped；部分保留的 disk、Public IP 或 Log 資源仍可能有少量費用。
 
 短暫休息可用 `Stop`，當天練習結束且近期不再使用時，執行：
 

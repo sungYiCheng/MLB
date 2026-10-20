@@ -45,6 +45,95 @@ flowchart LR
     FrontendPipeline -->|Angular build| SWA
 ```
 
+## 詳細 Azure 資源關聯圖
+
+```mermaid
+flowchart TB
+    Developer[Developer / Local Git]
+    GitHub[GitHub remote]
+    Repos[Azure Repos]
+    BackendCI[Backend CI/CD]
+    FrontendCI[Frontend CI/CD]
+    AksCI[AKS Lab Pipeline<br/>manual trigger]
+    User[Browser]
+    MLB[MLB Stats API]
+
+    subgraph DevRG[rg-mlb-ai-go-dev]
+        SWA[Static Web Apps<br/>Angular]
+        ACR[Container Registry<br/>Docker images]
+        CAE[Container Apps Environment]
+        CA[Container App<br/>.NET API]
+        OAI[Azure OpenAI Account]
+        Model[gpt-5-mini-briefing]
+        AppSecret[Container Apps Secret<br/>OpenAI API key]
+        Appi[Application Insights]
+        LAW[Log Analytics Workspace]
+        AcrIdentity[Managed Identity<br/>ACR pull]
+    end
+
+    subgraph AksRG[rg-mlb-ai-go-aks-lab]
+        AKS[AKS Cluster<br/>Stopped]
+        ControlID[Control plane identity]
+        KubeletID[Kubelet identity]
+    end
+
+    subgraph ManagedRG[AKS managed MC resource group]
+        VMSS[VM Scale Set<br/>2 x Standard_D2_v4]
+        VNet[VNet / NSG]
+        LB[Standard Load Balancer]
+        PublicIP[Gateway Public IP]
+        Disks[Managed OS disks]
+    end
+
+    subgraph K8s[Kubernetes resources, retained while stopped]
+        GW[Gateway API + TLS]
+        SVC[ClusterIP Service]
+        DEP[Deployment / ReplicaSet]
+        POD[API Pod]
+        CFG[ConfigMap / Secret]
+    end
+
+    Developer --> GitHub
+    Developer --> Repos
+    Repos --> BackendCI
+    Repos --> FrontendCI
+    Repos --> AksCI
+
+    BackendCI -->|test + ACR build| ACR
+    BackendCI -->|deploy revision| CA
+    FrontendCI -->|Angular build| SWA
+    AksCI -.start / deploy / stop.-> AKS
+    AksCI -.AKS image build.-> ACR
+
+    User -->|active HTTPS path| SWA
+    SWA -->|active API path| CA
+    CA --> MLB
+    CA --> OAI
+    OAI --> Model
+    AppSecret -.secret reference.-> CA
+    AcrIdentity -.pull image.-> CA
+    CA --> Appi
+    Appi --> LAW
+
+    ControlID --> AKS
+    AKS --> VMSS
+    VMSS --> VNet
+    VMSS --> Disks
+    KubeletID -.AcrPull.-> ACR
+    LB --> PublicIP
+
+    AKS -.controls.-> K8s
+    PublicIP -.AKS Running 時.-> GW
+    GW -.-> SVC
+    SVC -.-> POD
+    DEP -.creates.-> POD
+    CFG -.env.-> POD
+    POD -.-> MLB
+    POD -.telemetry.-> Appi
+```
+
+實線是目前正式環境正在使用的路徑；虛線是 AKS Lab 已建立但因 Cluster 停止而暫時不處理流量的路徑。
+
 ## 使用者打開網站時
 
 ```mermaid

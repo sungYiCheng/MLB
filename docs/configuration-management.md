@@ -51,13 +51,15 @@ Cors__AllowedOrigins__0=https://yellow-forest-04081e300.5.azurestaticapps.net
 
 ## Prod
 
-目前沒有購買自有 production domain，但 production frontend build 已指向 AKS Lab HTTPS：
+目前沒有購買自有 production domain。AKS Lab 曾使用以下 HTTPS hostname：
 
 ```text
 https://20-24-106-104.sslip.io
 ```
 
 `sslip.io` 適合練習，不代表正式商用網域。未來若購買正式前端網址，可以使用同樣方式設定 CORS：
+
+AKS 現在已停止，production frontend 已切回 Container Apps backend；上面的 hostname 是 AKS 練習設定，不是目前正式 API 路徑。
 
 ```text
 Cors__AllowedOrigins__0=https://正式前端網址
