@@ -4,6 +4,21 @@
 
 這份文件描述 AKS Lab 現在真正在 Azure 上的設定、停止前最後一次成功部署的 Kubernetes 資源，以及尚未補齊的部分。
 
+## 先用一句話理解
+
+AKS 可以想成一棟由 Azure 幫忙管理的大樓：
+
+- Cluster：整棟大樓。
+- Node：真正提供 CPU、記憶體的樓層。
+- Pod：樓層裡可以被替換的工作位置。
+- Container：坐在位置上，真正執行 .NET 程式的人。
+- Gateway：大樓入口與警衛。
+- HTTPRoute：警衛手上的分流規則。
+- Service：永遠不變的內部分機。
+- Deployment：規定現場應該保持幾個工作位置的主管。
+
+使用者不用知道 Pod 現在在哪台 Node，也不用知道 Pod IP。請求只要交給 Gateway，Kubernetes 會一路轉交給健康的 Pod。
+
 ## 先看目前狀態
 
 ### Azure 現在可確認的狀態
@@ -138,9 +153,43 @@ flowchart TB
 
     Browser -.AKS Running 時 HTTPS.-> PIP
     SWA -.若切回 AKS endpoint.-> PIP
+
+    classDef person fill:#dbeafe,stroke:#2563eb,color:#172554
+    classDef delivery fill:#f3f4f6,stroke:#4b5563,color:#111827
+    classDef azure fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+    classDef network fill:#ffedd5,stroke:#ea580c,color:#431407
+    classDef platform fill:#fef3c7,stroke:#d97706,color:#451a03
+    classDef workload fill:#dcfce7,stroke:#16a34a,color:#052e16
+    classDef config fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+
+    class Browser,SWA person
+    class DevOps delivery
+    class ACR,AKS,CPID,KubeletID azure
+    class LB,PIP,VNET,VMSS,Node1,Node2,Disk1,Disk2 network
+    class Istiod,GatewayProxy,CertManager,CoreDNS,GatewayClass,Gateway,HTTPRoute,Certificate,TLSSecret platform
+    class Deployment,ReplicaSet,Pod,Container,Service,Endpoint,Readiness,Liveness workload
+    class ConfigMap,AppSecret config
 ```
 
 圖上的虛線代表「需要 AKS Running 或設定切換後才會生效」。目前正式前端走 Container Apps，不走 AKS。
+
+### 這張圖要怎麼讀
+
+不要一次把全部背起來，照以下順序看即可：
+
+1. Azure 基礎設施：兩台 Node VM 提供真正的 CPU 與記憶體。
+2. Kubernetes 管理層：Deployment、ReplicaSet 負責確保 Pod 存在。
+3. 入口層：Public IP、Load Balancer、Gateway、HTTPRoute 接住外部請求。
+4. 應用層：Service 找到 Ready Pod，Pod 裡的 Container 執行 .NET API。
+5. 支援服務：ConfigMap、Secret 提供設定；Probes 檢查健康；Application Insights 收集記錄。
+
+顏色只是幫忙分組：
+
+- 藍色：使用者與前端。
+- 紫色：Azure 管理資源與 Identity。
+- 橘色：Node、網路、Public IP 等基礎設施。
+- 黃色：Gateway、TLS、cert-manager 等平台元件。
+- 綠色：真正承載 MLB API 的 Kubernetes workload。
 
 ## 流量如何進到 Pod
 
@@ -178,6 +227,17 @@ mlb-ai-api.mlb-ai-go.svc.cluster.local
 
 Gateway 和 HTTPRoute 只需要指向 Service，不需要知道 Pod 現在叫什麼或在哪台 Node。
 
+用生活例子來說：
+
+| Kubernetes | 生活例子 |
+| --- | --- |
+| Pod IP | 某位員工今天坐的位置，換人或重建後可能改變 |
+| Service | 公司固定的客服分機 |
+| HTTPRoute | 哪一類電話要轉到哪個部門的規則 |
+| Gateway | 公司總機與一樓入口 |
+
+即使 Pod 被刪除並重建，Service 仍會找到新的 Pod，所以外部網址不需要跟著改。
+
 ## 應用程式部署關係
 
 ```mermaid
@@ -208,6 +268,14 @@ flowchart LR
 - Limit 是 Container 最多能使用的上限。
 - Readiness 失敗時 Pod 不接 Service 流量。
 - Liveness 連續失敗時 kubelet 重啟 Container。
+
+### Deployment、ReplicaSet、Pod 為什麼要分三層
+
+- Deployment 管版本與更新策略。它知道需要幾個 Pod，以及 image 應該是哪一版。
+- ReplicaSet 管數量。它只在意現在有沒有維持指定數量的 Pod。
+- Pod 是實際被排程到 Node 上的執行單位，壞掉時可以整個換掉。
+
+Rolling Update 時，Deployment 會建立新的 ReplicaSet。新 Pod 健康後，再把舊 ReplicaSet 降到 0。Rollback 則是把先前的 ReplicaSet 再升回來。
 
 目前應用 Deployment 固定為 1 replica，尚未建立應用自己的 HPA 或 PDB。Managed Gateway 產生的 proxy 資源可能有平台管理的 HPA/PDB，但那不是 MLB API 的自動擴縮。
 
@@ -251,6 +319,16 @@ TLS termination 發生在 Gateway。瀏覽器到 Gateway 是 HTTPS；Gateway 解
 ### Workload Identity
 
 Cluster 已啟用 OIDC issuer 與 Workload Identity，但 MLB API Pod 目前仍沒有 Kubernetes ServiceAccount + Federated Credential，所以應用程式尚未使用 Workload Identity 存取 Azure OpenAI 或 Key Vault。
+
+白話來說，三種 Identity 是三張不同的工作證：
+
+| Identity | 工作證用途 |
+| --- | --- |
+| Control plane identity | AKS 管理員操作 Azure 基礎資源 |
+| Kubelet identity | Node 去 ACR 倉庫領取 Container Image |
+| Workload Identity | 未來讓 Pod 自己安全存取 Azure OpenAI 或 Key Vault |
+
+現在前兩張已經在使用，第三張只把機制打開，還沒有真正發給 MLB API Pod。
 
 ## AKS Pipeline 做了什麼
 

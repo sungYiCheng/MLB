@@ -43,6 +43,20 @@ flowchart LR
     BackendPipeline -->|ACR cloud build| ACR
     ACR -->|image| CA
     FrontendPipeline -->|Angular build| SWA
+
+    classDef person fill:#dbeafe,stroke:#2563eb,color:#172554
+    classDef source fill:#f3f4f6,stroke:#4b5563,color:#111827
+    classDef compute fill:#dcfce7,stroke:#16a34a,color:#052e16
+    classDef data fill:#ffedd5,stroke:#ea580c,color:#431407
+    classDef observe fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+    classDef secret fill:#fef3c7,stroke:#d97706,color:#451a03
+
+    class User person
+    class LocalGit,GitHub,AzureRepos,BackendPipeline,FrontendPipeline source
+    class SWA,CA,ACR compute
+    class MLB,AOAI data
+    class AppInsights,Logs observe
+    class Secret secret
 ```
 
 ## 詳細 Azure 資源關聯圖
@@ -130,9 +144,37 @@ flowchart TB
     CFG -.env.-> POD
     POD -.-> MLB
     POD -.telemetry.-> Appi
+
+    classDef person fill:#dbeafe,stroke:#2563eb,color:#172554
+    classDef delivery fill:#f3f4f6,stroke:#4b5563,color:#111827
+    classDef active fill:#dcfce7,stroke:#16a34a,color:#052e16
+    classDef service fill:#ffedd5,stroke:#ea580c,color:#431407
+    classDef observe fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+    classDef lab fill:#f3f4f6,stroke:#9ca3af,color:#374151
+
+    class Developer,User person
+    class GitHub,Repos,BackendCI,FrontendCI,AksCI delivery
+    class SWA,ACR,CAE,CA active
+    class OAI,Model,AppSecret,AcrIdentity service
+    class Appi,LAW observe
+    class AKS,ControlID,KubeletID,VMSS,VNet,LB,PublicIP,Disks,GW,SVC,DEP,POD,CFG lab
 ```
 
 實線是目前正式環境正在使用的路徑；虛線是 AKS Lab 已建立但因 Cluster 停止而暫時不處理流量的路徑。
+
+### 白話版：現在到底誰在做什麼
+
+| 元件 | 最直白的工作 |
+| --- | --- |
+| Static Web Apps | 把 Angular 畫面送到使用者瀏覽器 |
+| Container Apps | 目前正式執行 .NET API，不需要自己管理 VM |
+| MLB Stats API | 提供比賽、球隊與球員的原始資料 |
+| Azure OpenAI | 把後端整理好的 MLB 資料寫成每日摘要 |
+| Memory Cache | 15 分鐘內重複使用摘要，減少等待與 Token 費用 |
+| ACR | 存放 Backend 的 Docker Image |
+| Azure DevOps | 自動測試、建置 Image、部署與驗證 |
+| Application Insights | 記錄 API 是否正常、速度多快、哪裡失敗 |
+| AKS | Kubernetes 練習環境，目前停止，不承接正式流量 |
 
 ## 使用者打開網站時
 
