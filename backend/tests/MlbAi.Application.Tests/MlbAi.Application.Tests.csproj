@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\MlbAi.Application\MlbAi.Application.csproj" />
+    <ProjectReference Include="..\..\src\MlbAi.Infrastructure\MlbAi.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

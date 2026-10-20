@@ -195,6 +195,7 @@ if ([string]::IsNullOrWhiteSpace($subscription)) {
 
 foreach ($provider in @(
     'Microsoft.App',
+    'Microsoft.CognitiveServices',
     'Microsoft.ContainerRegistry',
     'Microsoft.Insights',
     'Microsoft.ManagedIdentity',

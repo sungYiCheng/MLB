@@ -2,7 +2,7 @@
 
 這份筆記用 step by step 的方式整理目前 MLB AI Daily 在 Azure 上已經建立與部署的內容，以及 CI/CD 怎麼把程式部署上去。
 
-最後更新：2026-10-07
+最後更新：2026-10-20
 
 ## Big Picture
 
@@ -27,10 +27,9 @@ GitHub / Azure DevOps Repo
 
 Browser
   -> Azure Static Web Apps
-      -> AKS Gateway API over HTTPS
-          -> ClusterIP Service
-          -> MLB API Pod
+      -> Azure Container Apps backend（目前正式路徑）
           -> MLB Stats API
+          -> Azure OpenAI
           -> Application Insights / Log Analytics
 
 AKS Lab
@@ -40,7 +39,7 @@ AKS Lab
           -> Application Insights
 ```
 
-AKS backend 已透過 Managed Gateway API、sslip.io、Let’s Encrypt 與 cert-manager 提供 `https://20-24-106-104.sslip.io`。Frontend production 已部署這個 AKS endpoint，公開網站現在會直接經 Gateway 與 Service 呼叫 AKS Pod。原本的 Container Apps backend 暫時保留，作為比較與回復路徑。
+AKS backend 已完成 Managed Gateway API、sslip.io、Let's Encrypt 與 cert-manager 的公開 HTTPS 練習。為了節省費用，AKS 目前停止，正式 frontend 已切回 Container Apps backend；重新啟動 AKS 後仍可繼續 Gateway、Pod、擴縮與 rollout 練習。
 
 ## Azure Resource Group
 
@@ -63,6 +62,7 @@ rg-mlb-ai-go-dev
 | Application Insights | `appi-mlb-ai-api-dev` | 看 requests、failures、duration、dependencies |
 | Managed workspace | `workspace-rgmlbaigodev3ZWi` | Container Apps 先前自動建立的 workspace |
 | Smart Detection | `Application Insights Smart Detection` | Application Insights 自動偵測相關資源 |
+| Azure OpenAI | `oai-mlb-ai-go-dev-7788` | 以 `gpt-5-mini-briefing` 產生 grounded MLB 每日摘要 |
 
 AKS 練習資源放在另一個 Resource Group：
 
@@ -120,6 +120,10 @@ AppBuildId
 AppImageTag
 APPLICATIONINSIGHTS_CONNECTION_STRING
 ApplicationInsights__ConnectionString
+AzureOpenAI__Endpoint
+AzureOpenAI__DeploymentName
+AzureOpenAI__ApiVersion
+AzureOpenAI__ApiKey
 ```
 
 其中：
@@ -131,6 +135,10 @@ ApplicationInsights__ConnectionString
 | `AppBuildId` | Azure DevOps build id |
 | `AppImageTag` | backend 使用的 image tag |
 | `ApplicationInsights__ConnectionString` | .NET 讀取 Application Insights connection string |
+| `AzureOpenAI__Endpoint` | Azure OpenAI account endpoint |
+| `AzureOpenAI__DeploymentName` | 程式實際呼叫的模型部署名稱 |
+| `AzureOpenAI__ApiVersion` | Azure OpenAI REST API 版本 |
+| `AzureOpenAI__ApiKey` | 透過 Container Apps secret reference 注入，不存入 Git |
 
 ## Frontend Hosting
 

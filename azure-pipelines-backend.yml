@@ -165,6 +165,7 @@ stages:
               echo "$health_response" | grep -q '"buildId"'
               echo "$health_response" | grep -q '"imageTag"'
               echo "$health_response" | grep -q '"application-insights"'
+              echo "$health_response" | grep -q '"azure-openai"'
 
               echo
               echo "Checking $(containerAppUrl)/"
@@ -194,5 +195,12 @@ stages:
 
               echo "Checking $(containerAppUrl)/api/games/today"
               curl --retry 5 --retry-delay 10 --retry-all-errors --fail "$(containerAppUrl)/api/games/today"
+
+              echo
+              echo "Checking $(containerAppUrl)/api/ai/daily-briefing"
+              briefing_response="$(curl --retry 5 --retry-delay 10 --retry-all-errors --fail "$(containerAppUrl)/api/ai/daily-briefing")"
+              echo "$briefing_response"
+              echo "$briefing_response" | grep -q '"mode"'
+              echo "$briefing_response" | grep -q '"headline"'
             displayName: Verify MLB data endpoint responds
             continueOnError: true

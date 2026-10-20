@@ -1,86 +1,126 @@
 # AI Daily Briefing 學習筆記
 
-## 這一階段的目標
+最後更新：2026-10-20
 
-這一階段先建立一條完整、可測試的 AI 功能管線，但暫時不呼叫付費模型：
+## 這一階段完成了什麼
+
+Daily Briefing 已從固定規則的 preview 升級成真正的 Azure OpenAI 功能：
 
 ```text
-Angular Daily Briefing 區塊
+Angular Daily Briefing
   -> GET /api/ai/daily-briefing
-  -> .NET API 同時取得賽程、戰績與數據領先者
-  -> DailyBriefingPreviewService 組成固定格式
-  -> 前端顯示重點賽事、關注球員與資料說明
+  -> .NET API 平行取得賽程、戰績、外卡與數據領先者
+  -> 整理成受限制的 grounding data
+  -> Azure OpenAI gpt-5-mini structured output
+  -> 驗證成 DailyBriefingDto
+  -> 快取 15 分鐘
+  -> 前端顯示摘要
 ```
 
-目前回應中的 `mode` 是 `preview`，`isAiGenerated` 是 `false`。這代表內容由可預測的程式規則產生，不是假裝成 AI 的文字。
-
-## 為什麼先做 Preview
-
-正式串接模型之前，先把 API 契約、畫面、錯誤處理、單元測試與 E2E 做好，可以將問題分開：
-
-- 畫面壞掉時，先查前端，不必懷疑模型。
-- JSON 格式錯誤時，先查 API 契約。
-- Azure OpenAI 尚未建立時，功能仍可在本機測試。
-- 未來更換模型時，前端不必跟著重寫。
-
-這種作法稱為先建立 integration boundary。模型是後端的一個實作細節，不應直接控制整個前端結構。
-
-## 新增的後端元件
-
-`DailyBriefingDto.cs`
-
-- 定義前後端共同依賴的 JSON 形狀。
-- 包含 headline、summary、keyGames、playersToWatch、dataNotes 與 generatedAtUtc。
-- `isAiGenerated` 讓畫面可以誠實區分 preview 與真正模型結果。
-
-`DailyBriefingPreviewService.cs`
-
-- 輸入真實 MLB 賽程、戰績與排行榜資料。
-- 以固定規則挑選最多三場比賽及四位領先球員。
-- 不呼叫外部生成式 AI，因此容易測試，也不產生 token 費用。
-
-`GET /api/ai/daily-briefing`
-
-- 平行取得三類 MLB 資料，縮短等待時間。
-- MLB API 無法使用時回傳 HTTP 503。
-- MLB API 逾時時回傳 HTTP 504。
-- 成功時回傳固定的 `DailyBriefingDto`。
-
-## 測試
-
-後端新增兩個單元測試：
-
-1. 有賽事時，確認比賽、先發投手與領先球員會進入固定格式。
-2. 沒有賽事時，確認仍能回傳合法且容易理解的空狀態。
-
-前端新增 E2E 測試，確認 Daily Briefing 可以收合與重新展開。整體驗證結果：
-
-- 後端單元測試：25 個通過。
-- 前端單元測試：7 個通過。
-- Playwright E2E：4 個通過。
-- Production build：成功。
-- 桌面與 390px 手機寬度：沒有文字重疊或水平溢位。
-
-## 下一階段如何換成真正 AI
-
-下一步不需要改前端契約，而是在後端加入模型提供者：
+正常成功時：
 
 ```text
-DailyBriefing endpoint
-  -> 收集可信 MLB 資料
-  -> 組成受限制的 prompt
-  -> Azure OpenAI structured output
-  -> 驗證輸出符合 DailyBriefingDto
-  -> 成功：isAiGenerated = true
-  -> 失敗：回退 preview，網站仍可使用
+mode = azure-openai
+isAiGenerated = true
 ```
 
-正式串接時還需要：
+Azure OpenAI 未設定、逾時、限流或回傳格式不合法時，API 會回到原本的 preview。這叫做 graceful degradation。AI 是加值功能，不應因為模型暫時不可用而讓整個 MLB 網站一起失效。
 
-- Azure OpenAI 或 Microsoft Foundry 模型部署。
-- Endpoint、deployment name 與 API key／Managed Identity 設定。
-- Timeout、retry、每日快取與 token 上限。
-- Application Insights 記錄延遲、token、模型版本與失敗原因。
-- 不把金鑰、完整 prompt 或敏感資料寫進 Git 與 log。
+## Azure 上新增的資源
 
-這個階段的重點不是讓模型寫一段漂亮文字，而是建立一個即使模型失敗，產品仍能正常運作的 AI 功能。
+| 項目 | 設定 |
+| --- | --- |
+| Resource group | `rg-mlb-ai-go-dev` |
+| Azure OpenAI account | `oai-mlb-ai-go-dev-7788` |
+| Region | Japan East |
+| Model deployment | `gpt-5-mini-briefing` |
+| Model/version | `gpt-5-mini` / `2025-08-07` |
+| Deployment type | GlobalStandard |
+| TPM capacity | 50K tokens/minute |
+| REST API version | `2024-10-21` |
+
+TPM capacity 是每分鐘能處理多少 token 的速率上限，不是預購一台固定收月租的 AI 主機。費用仍主要依實際輸入與輸出 token 計算。15 分鐘快取會避免每位訪客刷新頁面都重複付一次模型費用。
+
+## Container Apps 設定
+
+正式後端 `ca-mlb-ai-api` 使用以下環境變數：
+
+```text
+AzureOpenAI__Endpoint
+AzureOpenAI__DeploymentName
+AzureOpenAI__ApiVersion
+AzureOpenAI__ApiKey=secretref:azure-openai-api-key
+```
+
+雙底線 `__` 是 .NET 環境變數表示巢狀設定的方式。例如 `AzureOpenAI__DeploymentName` 等同於設定檔中的 `AzureOpenAI:DeploymentName`。
+
+API key 沒有寫進 Git、YAML 或一般環境變數值，而是存在 Container Apps secret `azure-openai-api-key`，程式只透過 secret reference 讀取。
+
+## 程式如何限制 AI
+
+`AzureOpenAiDailyBriefingService` 不會讓模型自行上網或自由猜測。它只接收後端已經從 MLB Stats API 取得的資料：
+
+- 最多 10 場當日比賽。
+- 各分區第一名。
+- 美聯、國聯外卡前五名。
+- 各主要數據前三名。
+
+System prompt 明確要求模型只能使用提供的資料，不得捏造比分、球員、傷勢、預測或其他事實。輸出使用 JSON Schema structured output，欄位固定為 `headline`、`summary`、`keyGames`、`playersToWatch`。
+
+這種「先找可信資料，再讓模型整理」的方式就是 grounded generation。它比單純問模型「今天 MLB 發生什麼」可靠得多。
+
+## 快取與成本
+
+第一次呼叫會取得 MLB 資料並請模型生成，實測約 6 秒。成功結果會放入後端記憶體快取 15 分鐘；第二次呼叫實測約 0.9 秒，且 `generatedAtUtc` 相同，證明沒有再次呼叫模型。
+
+目前是單一 Container App instance，所以 memory cache 很適合練習。如果未來擴成多個 instance，每台都有自己的快取，屆時可改用 Azure Cache for Redis 或資料庫共用結果。
+
+## Health Check 與 CI/CD
+
+`GET /health` 新增 `azure-openai` 檢查：
+
+- `configured`：必要設定都有提供。
+- `preview-fallback`：未設定模型，功能會使用 preview。
+
+Backend pipeline 也會確認 `/health` 包含 `azure-openai`，並呼叫 `/api/ai/daily-briefing` 檢查 `mode` 與 `headline`。Health check 本身只驗證設定是否存在，不會每次都花 token 呼叫模型。
+
+## 這次遇到的問題
+
+### 模型版本與配額
+
+原先嘗試的舊模型正在淘汰，新模型又不一定在每個區域都有可用 quota。最後先查 Japan East 的 subscription quota，再選擇可部署的 `gpt-5-mini`。
+
+### 新模型參數不同
+
+`gpt-5-mini` 使用 `max_completion_tokens`，不接受舊的 `max_tokens`；也不接受自訂 `temperature=0.2`。因此改用預設 temperature，並設定 `reasoning_effort=minimal`。
+
+### 429 限流
+
+10K TPM 對完整 MLB grounding request 太緊，Azure 回傳 HTTP 429。部署容量提高到 50K TPM 後可正常生成。程式仍保留 preview fallback，避免限流時整個 endpoint 失敗。
+
+### 環境變數名稱不一致
+
+程式讀取的是 `AzureOpenAI:DeploymentName`，最初測試時卻使用 `AzureOpenAI__Deployment`。少了 `Name` 會讓程式判定設定不完整。修正成 `AzureOpenAI__DeploymentName` 後，health 顯示 `configured`，API 正常回傳 `azure-openai`。
+
+## 本機測試方式
+
+本機若不提供 Azure OpenAI 設定，網站仍可正常使用 preview。需要測真實模型時，提供以下環境變數後啟動 API：
+
+```text
+AzureOpenAI__Endpoint
+AzureOpenAI__DeploymentName
+AzureOpenAI__ApiVersion
+AzureOpenAI__ApiKey
+```
+
+不要把 key 寫進 `appsettings.json`、commit、截圖或筆記。可由 Azure CLI 臨時取得並只放在目前 shell process 的環境變數中。
+
+## 目前學到的 AI 工程觀念
+
+- Model deployment：應用程式呼叫自己的部署名稱，不直接呼叫抽象模型名稱。
+- Grounding：模型只根據可信來源資料產生文字。
+- Structured output：用 schema 限制 JSON 形狀，降低前後端整合失敗。
+- Token/TPM：token 是使用量，TPM 是每分鐘吞吐上限。
+- Cache：減少延遲、重複 token 費用與限流機率。
+- Fallback：模型失效時回到可預測規則，維持產品可用性。
+- Secret management：敏感金鑰留在 Azure secret，不進入原始碼。
