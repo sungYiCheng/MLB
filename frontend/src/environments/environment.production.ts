@@ -1,3 +1,3 @@
 export const environment = {
-  apiBaseUrl: 'https://20-24-106-104.sslip.io'
+  apiBaseUrl: 'https://ca-mlb-ai-api.wonderfulpond-0bfd6efa.eastasia.azurecontainerapps.io'
 };
