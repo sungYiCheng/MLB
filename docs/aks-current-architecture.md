@@ -1,6 +1,6 @@
 # AKS 目前完整架構
 
-最後更新：2026-10-20
+最後更新：2026-10-21
 
 這份文件描述 AKS Lab 現在真正在 Azure 上的設定、停止前最後一次成功部署的 Kubernetes 資源，以及尚未補齊的部分。
 
@@ -62,134 +62,195 @@ AKS 停止後，Node VM 不執行，Pod、Service 與 Gateway 也不能處理流
 
 Public IP 與 hostname 是停止前的最後已知值。Cluster 或 Gateway 重建後 IP 可能改變，必須重新核對，不能永久假設仍是 `20.24.106.104`。
 
-## 完整 AKS 架構圖
+## 圖例與視角
+
+為避免同一條虛線同時表示網路、設定與停止狀態，AKS 架構拆成三張專業視圖：
+
+| 視圖 | 回答的問題 | 箭頭規則 |
+| --- | --- | --- |
+| Deployment Topology | 資源在哪個 Azure / Kubernetes 邊界內？ | 虛線只表示建立、管理、授權或包含關係 |
+| Runtime Request Flow | 一次外部請求如何走到 Container？ | 實線只表示執行時資料流 |
+| Kubernetes Ownership | Deployment、Pod、Service、設定如何互相配合？ | 虛線只表示控制、選取、注入或檢查 |
+
+外框是 Scope Boundary（範圍邊界），不是流量。灰色 `[STOPPED]` 表示資源仍存在，但目前不執行工作負載。
+
+## View 1：AKS Deployment Topology（部署拓撲）
+
+這張圖用 Azure Resource Group 與 Kubernetes Namespace 清楚切出管理邊界，不描述 HTTP 請求。
 
 ```mermaid
 flowchart TB
-    Browser[Browser]
-    SWA[Azure Static Web Apps<br/>Angular frontend]
-    MLB[MLB Stats API]
-    Insights[Application Insights]
-    ACR[Azure Container Registry<br/>acrmlbaigo]
     DevOps[Azure DevOps<br/>AKS Lab Pipeline]
+    ACR[Azure Container Registry<br/>acrmlbaigo]
+    Insights[Application Insights]
 
-    subgraph LabRG[Resource Group: rg-mlb-ai-go-aks-lab]
-        AKS[AKS managed control plane<br/>Free tier]
-        CPID[Control plane identity]
-        KubeletID[Kubelet identity<br/>AcrPull]
+    subgraph Subscription[Azure Subscription Boundary: Azure subscription 1]
+        subgraph LabRG[Resource Group Boundary: rg-mlb-ai-go-aks-lab]
+            AKS[AKS Managed Control Plane<br/>Free tier / STOPPED]
+            CPID[User-assigned Control Plane Identity]
+            KubeletID[Kubelet Identity]
+        end
+
+        subgraph NodeRG[AKS Managed Resource Group Boundary: MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia]
+            VMSS[VM Scale Set: nodepool1<br/>2 x Standard_D2_v4 / STOPPED]
+            Network[VNet + NSG<br/>Azure CNI Overlay]
+            LB[Standard Load Balancer]
+            PIP[Gateway Public IP]
+            Disks[2 x 32 GiB Managed OS Disk]
+        end
     end
 
-    subgraph NodeRG[Managed Resource Group: MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia]
-        LB[Standard Load Balancer]
-        PIP[Gateway Public IP]
-        VNET[VNet / NSG<br/>Azure CNI Overlay]
-        VMSS[VM Scale Set<br/>nodepool1]
-        Node1[Node 1<br/>Standard_D2_v4]
-        Node2[Node 2<br/>Standard_D2_v4]
-        Disk1[32 GiB OS Disk]
-        Disk2[32 GiB OS Disk]
+    subgraph Cluster[Logical AKS Cluster Boundary: aks-mlb-ai-go-lab]
+        subgraph SystemNS[System Namespace Boundary: kube-system / aks-istio-system / cert-manager]
+            Core[CoreDNS + Metrics Server + CSI + CNI]
+            Istiod[Istio Control Plane: istiod]
+            GatewayProxy[Managed Gateway Proxy]
+            CertManager[cert-manager Controllers]
+        end
+
+        subgraph AppNS[Application Namespace Boundary: mlb-ai-go]
+            Gateway[Gateway + HTTPRoute]
+            TLS[Certificate + TLS Secret]
+            Service[ClusterIP Service + EndpointSlice]
+            Workload[Deployment + ReplicaSet + Pod]
+            Config[ConfigMap + Application Secret]
+        end
     end
 
-    subgraph SystemNS[System namespaces]
-        Istiod[aks-istio-system<br/>istiod control plane]
-        GatewayProxy[Managed Gateway proxy<br/>generated workload]
-        CertManager[cert-manager<br/>controller / webhook]
-        CoreDNS[kube-system<br/>CoreDNS / metrics / CSI / CNI]
-    end
+    DevOps -. creates / starts / stops / deploys .-> AKS
+    DevOps -. cloud image build .-> ACR
+    CPID -. assigned to .-> AKS
+    KubeletID -. AcrPull permission .-> ACR
+    AKS -. manages node pool .-> VMSS
+    AKS -. provisions cluster network .-> Network
+    AKS -. provisions ingress frontend .-> LB
+    AKS -. provisions public address .-> PIP
+    VMSS -. attaches to .-> Network
+    VMSS -. uses .-> Disks
+    LB -. frontend IP configuration .-> PIP
+    AKS -. hosts Kubernetes API objects .-> Cluster
+    VMSS -. runs cluster workloads .-> Cluster
+    Istiod -. configures .-> GatewayProxy
+    CertManager -. issues certificate .-> TLS
+    Gateway -. references .-> TLS
+    Gateway -. backend reference .-> Service
+    Service -. selects .-> Workload
+    Config -. injects settings .-> Workload
+    Workload -. observability integration .-> Insights
 
-    subgraph AppNS[Namespace: mlb-ai-go]
-        GatewayClass[GatewayClass<br/>approuting-istio]
-        Gateway[Gateway<br/>HTTP 80 / HTTPS 443]
-        HTTPRoute[HTTPRoute<br/>hostname + PathPrefix /]
-        Certificate[Certificate<br/>mlb-ai-api-tls]
-        TLSSecret[Secret<br/>mlb-ai-api-tls]
-        ConfigMap[ConfigMap<br/>environment + CORS]
-        AppSecret[Secret<br/>Application Insights]
-        Deployment[Deployment<br/>replicas: 1]
-        ReplicaSet[ReplicaSet]
-        Pod[Pod]
-        Container[.NET API container<br/>port 8080]
-        Readiness[Readiness probe<br/>GET /health]
-        Liveness[Liveness probe<br/>GET /health]
-        Service[ClusterIP Service<br/>port 80 to 8080]
-        Endpoint[EndpointSlice<br/>Ready Pod IP]
-    end
-
-    DevOps -->|create / start / stop / deploy| AKS
-    DevOps -->|ACR cloud build| ACR
-    CPID --> AKS
-    KubeletID -->|pull image| ACR
-
-    AKS --> VMSS
-    VMSS --> Node1
-    VMSS --> Node2
-    VNET --> VMSS
-    Disk1 --> Node1
-    Disk2 --> Node2
-
-    PIP --> LB
-    LB --> GatewayProxy
-    Istiod -->|programs| GatewayProxy
-    GatewayClass --> Gateway
-    Gateway --> GatewayProxy
-    GatewayProxy --> HTTPRoute
-    HTTPRoute --> Service
-    Service --> Endpoint
-    Endpoint --> Pod
-
-    Deployment --> ReplicaSet
-    ReplicaSet --> Pod
-    Pod --> Container
-    ConfigMap -.envFrom.-> Container
-    AppSecret -.envFrom.-> Container
-    Readiness --> Container
-    Liveness --> Container
-    Container --> MLB
-    Container --> Insights
-
-    CertManager --> Certificate
-    Certificate --> TLSSecret
-    TLSSecret -.TLS termination.-> Gateway
-
-    Browser -.AKS Running 時 HTTPS.-> PIP
-    SWA -.若切回 AKS endpoint.-> PIP
-
-    classDef person fill:#dbeafe,stroke:#2563eb,color:#172554
-    classDef delivery fill:#f3f4f6,stroke:#4b5563,color:#111827
+    classDef delivery fill:#e0f2fe,stroke:#0369a1,color:#082f49
     classDef azure fill:#ede9fe,stroke:#7c3aed,color:#2e1065
-    classDef network fill:#ffedd5,stroke:#ea580c,color:#431407
-    classDef platform fill:#fef3c7,stroke:#d97706,color:#451a03
-    classDef workload fill:#dcfce7,stroke:#16a34a,color:#052e16
-    classDef config fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef infra fill:#ffedd5,stroke:#c2410c,color:#431407
+    classDef platform fill:#fef3c7,stroke:#b45309,color:#451a03
+    classDef workload fill:#dcfce7,stroke:#15803d,color:#052e16
+    classDef stopped fill:#f3f4f6,stroke:#6b7280,color:#374151,stroke-width:2px
 
-    class Browser,SWA person
     class DevOps delivery
-    class ACR,AKS,CPID,KubeletID azure
-    class LB,PIP,VNET,VMSS,Node1,Node2,Disk1,Disk2 network
-    class Istiod,GatewayProxy,CertManager,CoreDNS,GatewayClass,Gateway,HTTPRoute,Certificate,TLSSecret platform
-    class Deployment,ReplicaSet,Pod,Container,Service,Endpoint,Readiness,Liveness workload
-    class ConfigMap,AppSecret config
+    class ACR,Insights,CPID,KubeletID azure
+    class Network,LB,PIP,Disks infra
+    class Core,Istiod,GatewayProxy,CertManager,Gateway,TLS platform
+    class Service,Workload,Config workload
+    class AKS,VMSS stopped
 ```
 
-圖上的虛線代表「需要 AKS Running 或設定切換後才會生效」。目前正式前端走 Container Apps，不走 AKS。
+專業上會把 `rg-mlb-ai-go-aks-lab` 稱為使用者管理的 Resource Group；`MC_...` 則是 AKS 自動建立的 Managed Resource Group。後者裡面的 VMSS、網路與磁碟不應隨意手動修改，應透過 AKS 設定管理。
 
-### 這張圖要怎麼讀
+## View 2：AKS Runtime Request Flow（執行時請求流）
 
-不要一次把全部背起來，照以下順序看即可：
+這張圖完全不畫管理關係，只畫 Cluster 啟動且前端 API URL 指向 AKS 時，一次 HTTPS 請求的實際路徑。
 
-1. Azure 基礎設施：兩台 Node VM 提供真正的 CPU 與記憶體。
-2. Kubernetes 管理層：Deployment、ReplicaSet 負責確保 Pod 存在。
-3. 入口層：Public IP、Load Balancer、Gateway、HTTPRoute 接住外部請求。
-4. 應用層：Service 找到 Ready Pod，Pod 裡的 Container 執行 .NET API。
-5. 支援服務：ConfigMap、Secret 提供設定；Probes 檢查健康；Application Insights 收集記錄。
+```mermaid
+flowchart LR
+    Browser([Browser])
+    DNS[sslip.io DNS]
+    PIP[Azure Public IP]
+    LB[Azure Standard Load Balancer]
+    Proxy[Managed Istio Gateway Proxy<br/>TLS termination]
+    Route[Gateway API HTTPRoute<br/>hostname + PathPrefix /]
+    Service[ClusterIP Service<br/>80 to 8080]
+    Endpoint[EndpointSlice<br/>Ready Pod IP]
+    Pod[Ready Pod]
+    API[.NET API Container<br/>port 8080]
+    MLB[MLB Stats API]
+    Insights[Application Insights]
 
-顏色只是幫忙分組：
+    Browser -->|1. HTTPS| DNS
+    DNS -->|2. resolves hostname| PIP
+    PIP -->|3. TCP 443| LB
+    LB -->|4. forwards| Proxy
+    Proxy -->|5. decrypted HTTP| Route
+    Route -->|6. backendRef| Service
+    Service -->|7. chooses Ready endpoint| Endpoint
+    Endpoint -->|8. Pod IP| Pod
+    Pod -->|9. container port 8080| API
+    API -->|10a. MLB requests| MLB
+    API -->|10b. telemetry| Insights
 
-- 藍色：使用者與前端。
-- 紫色：Azure 管理資源與 Identity。
-- 橘色：Node、網路、Public IP 等基礎設施。
-- 黃色：Gateway、TLS、cert-manager 等平台元件。
-- 綠色：真正承載 MLB API 的 Kubernetes workload。
+    classDef actor fill:#dbeafe,stroke:#2563eb,color:#172554
+    classDef network fill:#ffedd5,stroke:#c2410c,color:#431407
+    classDef platform fill:#fef3c7,stroke:#b45309,color:#451a03
+    classDef workload fill:#dcfce7,stroke:#15803d,color:#052e16
+    classDef external fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+
+    class Browser actor
+    class DNS,PIP,LB network
+    class Proxy,Route platform
+    class Service,Endpoint,Pod,API workload
+    class MLB,Insights external
+```
+
+目前 Cluster 是 `STOPPED`，所以這條 Runtime Flow 暫時不通；正式前端仍連 Container Apps。圖保留的是 AKS 啟動時已驗證過的設計，不代表現在有流量進入 Pod。
+
+## View 3：Kubernetes Ownership（管理與相依關係）
+
+這張圖專門解釋 Kubernetes 為何有多層物件。所有虛線都是控制關係，不是封包流向。
+
+```mermaid
+flowchart TB
+    Deployment[Deployment<br/>宣告期望版本與副本數]
+    ReplicaSet[ReplicaSet<br/>維持指定數量的 Pod]
+    Pod[Pod<br/>最小排程單位]
+    Container[.NET API Container<br/>真正執行程式]
+    Scheduler[Kubernetes Scheduler]
+    Node[Node VM<br/>提供 CPU / Memory]
+    Service[ClusterIP Service]
+    Endpoint[EndpointSlice]
+    ConfigMap[ConfigMap<br/>非機密設定]
+    Secret[Secret<br/>機密設定]
+    Readiness[Readiness Probe<br/>可否接流量]
+    Liveness[Liveness Probe<br/>是否需要重啟]
+
+    Deployment -. owns .-> ReplicaSet
+    ReplicaSet -. owns and reconciles .-> Pod
+    Pod -. contains .-> Container
+    Scheduler -. assigns .-> Pod
+    Pod -. runs on .-> Node
+    Service -. label selector .-> Pod
+    Service -. resolves through .-> Endpoint
+    Endpoint -. records Ready Pod IP .-> Pod
+    ConfigMap -. envFrom .-> Container
+    Secret -. envFrom .-> Container
+    Readiness -. health check .-> Container
+    Liveness -. health check .-> Container
+
+    classDef control fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+    classDef workload fill:#dcfce7,stroke:#15803d,color:#052e16
+    classDef infra fill:#ffedd5,stroke:#c2410c,color:#431407
+    classDef config fill:#e0f2fe,stroke:#0369a1,color:#082f49
+
+    class Deployment,ReplicaSet,Scheduler control
+    class Pod,Container,Service,Endpoint workload
+    class Node infra
+    class ConfigMap,Secret,Readiness,Liveness config
+```
+
+### 三張圖要怎麼讀
+
+1. 想在 Azure Portal 找資源，先看 Deployment Topology。
+2. 想追查「瀏覽器為何打不到 API」，看 Runtime Request Flow，沿編號逐站檢查。
+3. 想理解 Pod 為何被建立、如何取得設定、為何能接流量，看 Kubernetes Ownership。
+4. 看見外框時，先讀它的完整標題；那是管理範圍，不是網路防火牆或請求路徑。
+5. 看見虛線時，讀箭頭上的動詞，例如 `owns`、`selects`、`injects`，就能知道是哪種控制關係。
 
 ## 流量如何進到 Pod
 

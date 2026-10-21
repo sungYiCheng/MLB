@@ -1,166 +1,130 @@
 # MLB AI GO 目前架構總覽
 
-最後更新：2026-10-20
+最後更新：2026-10-21
 
-## 一張圖看目前架構
+## 圖例與閱讀規則
+
+這份文件採用常見的多視角架構表達方式：每張圖只回答一種問題，不把部署、流量與資源所有權混在一起。
+
+| 圖形表示 | 固定意義 |
+| --- | --- |
+| 實線箭頭 | 執行時的 HTTP 請求、回應或 Telemetry 資料流 |
+| 虛線箭頭 | 部署、管理、設定注入、選取或所有權；不是使用者流量 |
+| 有標題的外框 | Azure Subscription、Resource Group、Cluster、Namespace 等資源邊界 |
+| 綠色節點 `[ACTIVE]` | 現在承接正式流量 |
+| 灰色節點 `[STOPPED]` | 資源仍保留，但目前不提供運算或流量服務 |
+
+外框只回答「這個資源放在哪裡或由誰管理」，箭頭才表示元件之間的關係。不要把框線當成網路流向。
+
+## View 1：System Context（系統全貌）
+
+這張圖只看使用者實際會經過哪些系統，不展開 Azure 與 Kubernetes 內部細節。
 
 ```mermaid
 flowchart LR
-    User[使用者瀏覽器]
-
-    subgraph Source[原始碼與 CI/CD]
-        LocalGit[Local Git<br/>main branch]
-        GitHub[GitHub<br/>sungYiCheng/MLB]
-        AzureRepos[Azure Repos<br/>MLB_AI_GO]
-        BackendPipeline[Backend Pipeline<br/>Test / Build / Deploy]
-        FrontendPipeline[Frontend Pipeline<br/>Test / Build / Deploy]
-    end
-
-    subgraph AzureDev[Azure dev 環境]
-        SWA[Static Web Apps<br/>Angular 前端]
-        CA[Container Apps<br/>.NET Backend API]
-        ACR[Container Registry<br/>Backend images]
-        AOAI[Azure OpenAI<br/>gpt-5-mini-briefing]
-        AppInsights[Application Insights]
-        Logs[Log Analytics]
-        Secret[Container Apps Secret<br/>Azure OpenAI API key]
-    end
-
+    User([使用者])
+    SWA[Azure Static Web Apps<br/>Angular 前端<br/>ACTIVE]
+    CA[Azure Container Apps<br/>.NET API<br/>ACTIVE]
     MLB[MLB Stats API]
+    AOAI[Azure OpenAI]
+    Monitor[Application Insights]
+    AKS[AKS Lab<br/>Kubernetes 練習環境<br/>STOPPED]
 
-    User -->|HTTPS| SWA
-    SWA -->|HTTPS + CORS| CA
-    CA -->|取得比賽資料| MLB
-    CA -->|grounded prompt| AOAI
-    Secret -.安全注入.-> CA
-    CA -->|requests / errors / dependencies| AppInsights
-    AppInsights --> Logs
+    User -->|1. HTTPS| SWA
+    SWA -->|2. HTTPS API + CORS| CA
+    CA -->|3a. 比賽資料| MLB
+    CA -->|3b. AI 摘要| AOAI
+    CA -->|3c. Telemetry| Monitor
 
-    LocalGit -->|push main| GitHub
-    LocalGit -->|push main| AzureRepos
-    AzureRepos --> BackendPipeline
-    AzureRepos --> FrontendPipeline
-    BackendPipeline -->|ACR cloud build| ACR
-    ACR -->|image| CA
-    FrontendPipeline -->|Angular build| SWA
-
-    classDef person fill:#dbeafe,stroke:#2563eb,color:#172554
-    classDef source fill:#f3f4f6,stroke:#4b5563,color:#111827
-    classDef compute fill:#dcfce7,stroke:#16a34a,color:#052e16
-    classDef data fill:#ffedd5,stroke:#ea580c,color:#431407
+    classDef actor fill:#dbeafe,stroke:#2563eb,color:#172554
+    classDef active fill:#dcfce7,stroke:#15803d,color:#052e16,stroke-width:2px
+    classDef external fill:#ffedd5,stroke:#c2410c,color:#431407
     classDef observe fill:#ede9fe,stroke:#7c3aed,color:#2e1065
-    classDef secret fill:#fef3c7,stroke:#d97706,color:#451a03
+    classDef stopped fill:#f3f4f6,stroke:#6b7280,color:#374151,stroke-width:2px
 
-    class User person
-    class LocalGit,GitHub,AzureRepos,BackendPipeline,FrontendPipeline source
-    class SWA,CA,ACR compute
-    class MLB,AOAI data
-    class AppInsights,Logs observe
-    class Secret secret
+    class User actor
+    class SWA,CA active
+    class MLB,AOAI external
+    class Monitor observe
+    class AKS stopped
 ```
 
-## 詳細 Azure 資源關聯圖
+AKS 在圖上沒有接到實線，代表它目前不是正式網站的流量路徑；這比用一條含糊的虛線表示「可能會走」更精確。
+
+## View 2：Azure Resource Topology（資源拓撲）
+
+這張圖只回答「資源放在哪個邊界、由誰部署與管理」。所有箭頭都是管理關係，因此統一使用虛線，不代表 HTTP 流量。
 
 ```mermaid
 flowchart TB
-    Developer[Developer / Local Git]
-    GitHub[GitHub remote]
-    Repos[Azure Repos]
-    BackendCI[Backend CI/CD]
-    FrontendCI[Frontend CI/CD]
-    AksCI[AKS Lab Pipeline<br/>manual trigger]
-    User[Browser]
-    MLB[MLB Stats API]
+    Dev[Developer / Local Git]
+    GitHub[GitHub<br/>sungYiCheng/MLB]
 
-    subgraph DevRG[rg-mlb-ai-go-dev]
-        SWA[Static Web Apps<br/>Angular]
-        ACR[Container Registry<br/>Docker images]
-        CAE[Container Apps Environment]
-        CA[Container App<br/>.NET API]
-        OAI[Azure OpenAI Account]
-        Model[gpt-5-mini-briefing]
-        AppSecret[Container Apps Secret<br/>OpenAI API key]
-        Appi[Application Insights]
-        LAW[Log Analytics Workspace]
-        AcrIdentity[Managed Identity<br/>ACR pull]
+    subgraph DevOpsBoundary[Azure DevOps Organization: bbshare7788]
+        Repos[Azure Repos<br/>MLB_AI_GO]
+        FrontCI[Frontend Pipeline]
+        BackCI[Backend Pipeline]
+        AksCI[AKS Lab Pipeline]
     end
 
-    subgraph AksRG[rg-mlb-ai-go-aks-lab]
-        AKS[AKS Cluster<br/>Stopped]
-        ControlID[Control plane identity]
-        KubeletID[Kubelet identity]
+    subgraph Subscription[Azure Subscription Boundary: Azure subscription 1]
+        subgraph DevRG[Resource Group Boundary: rg-mlb-ai-go-dev]
+            SWA[Static Web Apps]
+            ACR[Container Registry]
+            CAE[Container Apps Environment]
+            CA[Container App]
+            AOAI[Azure OpenAI + Deployment]
+            Appi[Application Insights]
+            LAW[Log Analytics Workspace]
+            PullID[Managed Identity<br/>ACR pull]
+        end
+
+        subgraph AksRG[Resource Group Boundary: rg-mlb-ai-go-aks-lab]
+            AKS[AKS Cluster<br/>STOPPED]
+            ControlID[Control plane identity]
+            KubeletID[Kubelet identity]
+        end
+
+        subgraph ManagedRG[AKS Managed Resource Group Boundary: MC_rg-mlb-ai-go-aks-lab_aks-mlb-ai-go-lab_eastasia]
+            VMSS[VM Scale Set<br/>2 x Standard_D2_v4]
+            Net[VNet / NSG / Load Balancer]
+            PIP[Gateway Public IP]
+            Disks[Managed OS Disks]
+        end
     end
 
-    subgraph ManagedRG[AKS managed MC resource group]
-        VMSS[VM Scale Set<br/>2 x Standard_D2_v4]
-        VNet[VNet / NSG]
-        LB[Standard Load Balancer]
-        PublicIP[Gateway Public IP]
-        Disks[Managed OS disks]
-    end
+    Dev -. push .-> GitHub
+    Dev -. push .-> Repos
+    Repos -. triggers .-> FrontCI
+    Repos -. triggers .-> BackCI
+    Repos -. manual trigger .-> AksCI
+    FrontCI -. deploys .-> SWA
+    BackCI -. builds image .-> ACR
+    BackCI -. deploys revision .-> CA
+    AksCI -. start / deploy / stop .-> AKS
+    AksCI -. builds AKS image .-> ACR
+    CAE -. hosts .-> CA
+    PullID -. grants image pull .-> CA
+    Appi -. stores logs in .-> LAW
+    ControlID -. assigned to .-> AKS
+    KubeletID -. AcrPull role .-> ACR
+    AKS -. Azure creates and manages .-> VMSS
+    AKS -. Azure creates and manages .-> Net
+    AKS -. Azure creates and manages .-> PIP
+    AKS -. Azure creates and manages .-> Disks
 
-    subgraph K8s[Kubernetes resources, retained while stopped]
-        GW[Gateway API + TLS]
-        SVC[ClusterIP Service]
-        DEP[Deployment / ReplicaSet]
-        POD[API Pod]
-        CFG[ConfigMap / Secret]
-    end
+    classDef delivery fill:#e0f2fe,stroke:#0369a1,color:#082f49
+    classDef active fill:#dcfce7,stroke:#15803d,color:#052e16
+    classDef control fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+    classDef infra fill:#ffedd5,stroke:#c2410c,color:#431407
+    classDef stopped fill:#f3f4f6,stroke:#6b7280,color:#374151
 
-    Developer --> GitHub
-    Developer --> Repos
-    Repos --> BackendCI
-    Repos --> FrontendCI
-    Repos --> AksCI
-
-    BackendCI -->|test + ACR build| ACR
-    BackendCI -->|deploy revision| CA
-    FrontendCI -->|Angular build| SWA
-    AksCI -.start / deploy / stop.-> AKS
-    AksCI -.AKS image build.-> ACR
-
-    User -->|active HTTPS path| SWA
-    SWA -->|active API path| CA
-    CA --> MLB
-    CA --> OAI
-    OAI --> Model
-    AppSecret -.secret reference.-> CA
-    AcrIdentity -.pull image.-> CA
-    CA --> Appi
-    Appi --> LAW
-
-    ControlID --> AKS
-    AKS --> VMSS
-    VMSS --> VNet
-    VMSS --> Disks
-    KubeletID -.AcrPull.-> ACR
-    LB --> PublicIP
-
-    AKS -.controls.-> K8s
-    PublicIP -.AKS Running 時.-> GW
-    GW -.-> SVC
-    SVC -.-> POD
-    DEP -.creates.-> POD
-    CFG -.env.-> POD
-    POD -.-> MLB
-    POD -.telemetry.-> Appi
-
-    classDef person fill:#dbeafe,stroke:#2563eb,color:#172554
-    classDef delivery fill:#f3f4f6,stroke:#4b5563,color:#111827
-    classDef active fill:#dcfce7,stroke:#16a34a,color:#052e16
-    classDef service fill:#ffedd5,stroke:#ea580c,color:#431407
-    classDef observe fill:#ede9fe,stroke:#7c3aed,color:#2e1065
-    classDef lab fill:#f3f4f6,stroke:#9ca3af,color:#374151
-
-    class Developer,User person
-    class GitHub,Repos,BackendCI,FrontendCI,AksCI delivery
-    class SWA,ACR,CAE,CA active
-    class OAI,Model,AppSecret,AcrIdentity service
-    class Appi,LAW observe
-    class AKS,ControlID,KubeletID,VMSS,VNet,LB,PublicIP,Disks,GW,SVC,DEP,POD,CFG lab
+    class Dev,GitHub,Repos,FrontCI,BackCI,AksCI delivery
+    class SWA,ACR,CAE,CA,AOAI,Appi,LAW,PullID active
+    class ControlID,KubeletID control
+    class VMSS,Net,PIP,Disks infra
+    class AKS stopped
 ```
-
-實線是目前正式環境正在使用的路徑；虛線是 AKS Lab 已建立但因 Cluster 停止而暫時不處理流量的路徑。
 
 ### 白話版：現在到底誰在做什麼
 
